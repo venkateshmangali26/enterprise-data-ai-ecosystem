@@ -1,0 +1,33 @@
+{
+  "name": "enterprise-data-ai-ecosystem",
+  "version": "2.0.0",
+  "description": "Tri-Pillar Enterprise Data & AI Portfolio: Retail Analytics, AutoRAG Engine, and Predictive Maintenance ML",
+  "type": "module",
+  "scripts": {
+    "start": "bun run backend/src/server.ts",
+    "seed": "bun run backend/src/seed.ts",
+    "build:frontend": "cd frontend && bun run build",
+    "dev:backend": "bun --watch backend/src/server.ts",
+    "dev:frontend": "cd frontend && bun run dev",
+    "start:rag": "python -m uvicorn autorag-telemetry.main:app --host 0.0.0.0 --port 8000",
+    "test:rag": "python -m pytest autorag-telemetry/test_rag_engine.py -v",
+    "train:ml": "python predictive-maintenance-ml/src/train.py"
+  },
+  "keywords": [
+    "retail-analytics",
+    "star-schema",
+    "power-bi",
+    "dax",
+    "autorag",
+    "fastapi",
+    "vector-search",
+    "predictive-maintenance",
+    "isolation-forest",
+    "bun",
+    "sqlite",
+    "react",
+    "mlops"
+  ],
+  "author": "Enterprise Data & AI Architecture",
+  "license": "MIT"
+}

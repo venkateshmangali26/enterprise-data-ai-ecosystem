@@ -1,0 +1,11 @@
+{
+  "name": "retail-analytics-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "seed": "bun run src/seed.ts",
+    "dev": "bun --watch src/server.ts",
+    "start": "bun run src/server.ts"
+  }
+}
+

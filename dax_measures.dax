@@ -1,0 +1,208 @@
+/*
+================================================================================
+EXECUTIVE RETAIL PERFORMANCE DASHBOARD - DAX MEASURES SUITE
+Model Structure: 1-to-Many Star Schema
+Engine: Microsoft Analysis Services / Power BI VertiPaq Tabular Engine
+================================================================================
+*/
+
+-- =============================================================================
+-- 1. BASE VOLUME & CORE REVENUE MEASURES
+-- =============================================================================
+
+/// <summary>
+/// Total quantity of units sold across all filtered transactions.
+/// Uses simple VertiPaq-native SUM aggregation.
+/// </summary>
+Total Units Sold = 
+SUM(Fact_Transactions[Quantity])
+
+
+/// <summary>
+/// Total unique orders placed.
+/// High performance calculation leveraging VertiPaq integer column dictionary.
+/// </summary>
+Total Orders = 
+DISTINCTCOUNT(Fact_Transactions[Order_ID])
+
+
+/// <summary>
+/// Total Revenue calculated dynamically factoring in Quantity, Unit Price, and Discount %.
+/// Best Practice:
+/// - If Net_Revenue is pre-computed in ETL, SUM(Fact_Transactions[Net_Revenue]) delivers
+///   sub-millisecond VertiPaq scan speeds.
+/// - When calculating dynamically across line items, SUMX iterates over Fact_Transactions
+///   while remaining fully vectorized inside the Storage Engine (SE).
+/// </summary>
+Total Revenue = 
+SUMX(
+    Fact_Transactions,
+    Fact_Transactions[Quantity] * Fact_Transactions[Unit_Price] * (1 - Fact_Transactions[Discount_Pct])
+)
+
+
+/// <summary>
+/// Total Cost of Goods Sold (COGS).
+/// Multiplies transaction quantity by line-item unit cost.
+/// </summary>
+Total Cost = 
+SUMX(
+    Fact_Transactions,
+    Fact_Transactions[Quantity] * Fact_Transactions[Unit_Cost]
+)
+
+
+-- =============================================================================
+-- 2. PROFITABILITY & MARGIN MEASURES
+-- =============================================================================
+
+/// <summary>
+/// Gross Profit expressed in currency.
+/// Reuses existing base measures to leverage DAX engine plan caching.
+/// </summary>
+Gross Profit = 
+[Total Revenue] - [Total Cost]
+
+
+/// <summary>
+/// Gross Profit Margin percentage.
+/// Best Practice:
+/// - Uses DIVIDE() function to prevent divide-by-zero crashes (#DIV/0!).
+/// - Automatically returns BLANK() instead of error, keeping visuals uncluttered.
+/// - Eliminates expensive IF(ISBLANK(...)) condition checks.
+/// </summary>
+Profit Margin % = 
+DIVIDE(
+    [Gross Profit],
+    [Total Revenue],
+    BLANK()
+)
+
+
+-- =============================================================================
+-- 3. TIME INTELLIGENCE & MOM GROWTH
+-- =============================================================================
+
+/// <summary>
+/// Revenue for the prior calendar month.
+/// Best Practice:
+/// - Requires Dim_Calendar to be marked as 'Date Table' with continuous dates.
+/// - DATEADD shifts the active date filter by -1 month while respecting monthly day counts.
+/// </summary>
+Revenue Previous Month = 
+CALCULATE(
+    [Total Revenue],
+    DATEADD('Dim_Calendar'[Date], -1, MONTH)
+)
+
+
+/// <summary>
+/// Absolute Month-over-Month Revenue Growth.
+/// Employs VAR (variables) to evaluate each measure exactly once, eliminating redundant
+/// formula engine roundtrips.
+/// </summary>
+MoM Revenue Growth = 
+VAR CurrentRevenue = [Total Revenue]
+VAR PriorRevenue   = [Revenue Previous Month]
+RETURN
+    IF(
+        NOT ISBLANK(CurrentRevenue) && NOT ISBLANK(PriorRevenue),
+        CurrentRevenue - PriorRevenue,
+        BLANK()
+    )
+
+
+/// <summary>
+/// Percentage Month-over-Month Revenue Growth.
+/// Best Practice:
+/// - Caches Current and Prior revenue into variables.
+/// - Uses DIVIDE for zero-safe division.
+/// - Suppresses visual noise when previous month has no comparative baseline.
+/// </summary>
+MoM Revenue Growth % = 
+VAR CurrentRevenue = [Total Revenue]
+VAR PriorRevenue   = [Revenue Previous Month]
+VAR RevenueDiff    = CurrentRevenue - PriorRevenue
+RETURN
+    DIVIDE(
+        RevenueDiff,
+        PriorRevenue,
+        BLANK()
+    )
+
+
+-- =============================================================================
+-- 4. RUNNING TOTAL (YEAR-TO-DATE)
+-- =============================================================================
+
+/// <summary>
+/// Year-to-Date (YTD) Revenue running total.
+/// Best Practice:
+/// - TOTALYTD acts as syntax sugar for CALCULATE([Total Revenue], DATESYTD('Dim_Calendar'[Date])).
+/// - Added date filter safety guard ensures future dates do not project flat lines past
+///   the latest recorded transaction date.
+/// </summary>
+Revenue YTD = 
+VAR MaxDataDate = CALCULATE(MAX(Fact_Transactions[Order_Date]), ALL(Fact_Transactions))
+VAR CurrentDate = MAX('Dim_Calendar'[Date])
+RETURN
+    IF(
+        CurrentDate <= MaxDataDate,
+        TOTALYTD(
+            [Total Revenue],
+            'Dim_Calendar'[Date]
+        ),
+        BLANK()
+    )
+
+
+-- =============================================================================
+-- 5. AVERAGE ORDER VALUE (AOV) & BASKET METRICS
+-- =============================================================================
+
+/// <summary>
+/// Average Order Value (AOV).
+/// Evaluates average spend per unique order.
+/// Best Practice:
+/// - Avoids iterating over DISTINCT orders with AVERAGEX(VALUES(...)), which can allocate
+///   massive memory structures for 350,000+ orders.
+/// - Simple division of [Total Revenue] / [Total Orders] executes directly via VertiPaq
+///   hash tables in under 5ms.
+/// </summary>
+Average Order Value = 
+DIVIDE(
+    [Total Revenue],
+    [Total Orders],
+    BLANK()
+)
+
+
+/// <summary>
+/// Average Units per Order (Basket Size).
+/// Measures average items per customer checkout.
+/// </summary>
+Items per Order = 
+DIVIDE(
+    [Total Units Sold],
+    [Total Orders],
+    BLANK()
+)
+
+
+/// <summary>
+/// Total active unique customers in the selected filter context.
+/// </summary>
+Unique Customers = 
+DISTINCTCOUNT(Fact_Transactions[Customer_ID])
+
+
+/// <summary>
+/// Revenue generated per unique customer.
+/// </summary>
+Revenue per Customer = 
+DIVIDE(
+    [Total Revenue],
+    [Unique Customers],
+    BLANK()
+)
+
