@@ -133,17 +133,20 @@ class DenseVectorStore:
 
     def _init_encoder(self):
         """Loads lightweight sentence-transformer; falls back gracefully to TF-IDF hashing."""
-        try:
-            from sentence_transformers import SentenceTransformer
-            logger.info("Initializing sentence-transformers/all-MiniLM-L6-v2...")
-            self.model = SentenceTransformer("all-MiniLM-L6-v2")
-            self.dim = 384
-            self.encoder_name = "all-MiniLM-L6-v2 (384-dim)"
-        except Exception as e:
-            logger.warning(f"SentenceTransformers unavailable ({e}). Initializing fallback HashingVectorizer (dim=256).")
-            self.model = None
-            self.dim = 256
-            self.encoder_name = "HashingVectorizerFallback (256-dim)"
+        fast_mode = os.getenv("AUTORAG_FAST_FALLBACK", "1") == "1"
+        if not fast_mode:
+            try:
+                from sentence_transformers import SentenceTransformer
+                logger.info("Initializing sentence-transformers/all-MiniLM-L6-v2...")
+                self.model = SentenceTransformer("all-MiniLM-L6-v2")
+                self.dim = 384
+                self.encoder_name = "all-MiniLM-L6-v2 (384-dim)"
+                return
+            except Exception as e:
+                logger.warning(f"SentenceTransformers unavailable ({e}). Initializing fallback HashingVectorizer (dim=256).")
+        self.model = None
+        self.dim = 256
+        self.encoder_name = "HashingVectorizerFallback (256-dim)"
 
     def _encode(self, texts: List[str]) -> np.ndarray:
         if self.model is not None:
