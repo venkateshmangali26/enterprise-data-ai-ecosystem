@@ -4,8 +4,7 @@ import {
   Sun, 
   Moon, 
   RotateCw, 
-  Database, 
-  Layers
+  Database
 } from "lucide-react";
 
 interface NavbarProps {
@@ -31,8 +30,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   onCategoryChange,
   totalTransactions,
 }) => {
-  const regions = ["All", "East", "West", "Midwest", "South"];
-  const categories = ["All", "Apparel", "Beauty", "Electronics", "Home & Kitchen", "Sports"];
+  const regions = ["All", "North", "South", "West", "East", "Central"];
+  const categories = [
+    "All",
+    "Ethnic & Modern Apparel",
+    "Electronics & Gadgets",
+    "Home & Kitchen",
+    "Personal Care & Ayurveda",
+    "Sports & Fitness",
+  ];
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-[#0c0c0f]/80 backdrop-blur-md transition-colors">
@@ -40,20 +46,20 @@ export const Navbar: React.FC<NavbarProps> = ({
         
         {/* Brand identity */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-emerald-500/20 border border-orange-500/30 flex items-center justify-center text-orange-600 dark:text-orange-400 shadow-sm">
             <BarChart3 className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-                RetailPulse Analytics
+                BharatRetail Analytics
               </h1>
-              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
-                Star Schema
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-900">
+                🇮🇳 India Star Schema
               </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Executive Business Performance & Analytical Intelligence
+              Pan-India Enterprise Performance & Festive Demand Intelligence
             </p>
           </div>
         </div>
@@ -65,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <Database className="w-3.5 h-3.5 text-zinc-400" />
-            <span>{(totalTransactions || 150000).toLocaleString()} Rows</span>
+            <span>{(totalTransactions || 150000).toLocaleString("en-IN")} Txns</span>
           </div>
 
           {/* Region Filter */}
@@ -74,11 +80,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <select
               value={selectedRegion}
               onChange={(e) => onRegionChange(e.target.value)}
-              className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-500/40 focus:outline-none transition-all cursor-pointer"
+              className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-orange-500/40 focus:outline-none transition-all cursor-pointer"
             >
               {regions.map((r) => (
                 <option key={r} value={r}>
-                  {r === "All" ? "All Regions" : `${r} Region`}
+                  {r === "All" ? "All India" : `${r} Region`}
                 </option>
               ))}
             </select>
@@ -90,7 +96,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <select
               value={selectedCategory}
               onChange={(e) => onCategoryChange(e.target.value)}
-              className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-500/40 focus:outline-none transition-all cursor-pointer"
+              className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-orange-500/40 focus:outline-none transition-all cursor-pointer max-w-[160px] truncate"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>
@@ -107,7 +113,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             disabled={isLoading}
             className="p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 shadow-sm"
           >
-            <RotateCw className={`w-4 h-4 ${isLoading ? "animate-spin text-blue-500" : ""}`} />
+            <RotateCw className={`w-4 h-4 ${isLoading ? "animate-spin text-orange-500" : ""}`} />
           </button>
 
           {/* Theme switch */}
@@ -124,4 +130,3 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
-

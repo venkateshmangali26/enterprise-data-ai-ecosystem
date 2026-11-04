@@ -1,5 +1,6 @@
 import React from "react";
 import { TransactionItem } from "../types";
+import { formatINRCurrency } from "../utils/formatters";
 import { 
   X, 
   Receipt, 
@@ -7,8 +8,7 @@ import {
   Store, 
   Package, 
   FileDown, 
-  CheckCircle2, 
-  AlertCircle 
+  CheckCircle2
 } from "lucide-react";
 
 interface InvestigationDrawerProps {
@@ -28,7 +28,7 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
       {/* Header */}
       <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+          <div className="p-2 rounded-lg bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400">
             <Receipt className="w-5 h-5" />
           </div>
           <div>
@@ -36,7 +36,7 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
               {transaction.order_id}
             </h3>
             <p className="text-xs text-zinc-500 font-mono">
-              Txn: {transaction.transaction_id}
+              Invoice / Txn: {transaction.transaction_id}
             </p>
           </div>
         </div>
@@ -55,9 +55,9 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
         {/* Economics Card */}
         <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-zinc-600 dark:text-zinc-400">Transaction Financials</span>
+            <span className="font-semibold text-zinc-600 dark:text-zinc-400">GST Invoice Financials</span>
             <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-              ${transaction.net_revenue?.toFixed(2)} Net Rev
+              {formatINRCurrency(transaction.net_revenue)} Net
             </span>
           </div>
 
@@ -68,19 +68,19 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
             </div>
             <div>
               <div className="text-zinc-400">Unit Retail Price</div>
-              <div className="font-semibold text-zinc-900 dark:text-zinc-100">${transaction.unit_price?.toFixed(2)}</div>
+              <div className="font-semibold text-zinc-900 dark:text-zinc-100">{formatINRCurrency(transaction.unit_price)}</div>
             </div>
             <div>
               <div className="text-zinc-400">Unit Cost (COGS)</div>
-              <div className="font-semibold text-zinc-900 dark:text-zinc-100">${transaction.unit_cost?.toFixed(2)}</div>
+              <div className="font-semibold text-zinc-900 dark:text-zinc-100">{formatINRCurrency(transaction.unit_cost)}</div>
             </div>
             <div>
-              <div className="text-zinc-400">Discount Applied</div>
+              <div className="text-zinc-400">Festive Discount</div>
               <div className="font-semibold text-amber-600 dark:text-amber-400">{(transaction.discount_pct * 100).toFixed(0)}%</div>
             </div>
             <div>
               <div className="text-zinc-400">Gross Profit</div>
-              <div className="font-semibold text-emerald-600 dark:text-emerald-400">${transaction.gross_profit?.toFixed(2)}</div>
+              <div className="font-semibold text-emerald-600 dark:text-emerald-400">{formatINRCurrency(transaction.gross_profit)}</div>
             </div>
             <div>
               <div className="text-zinc-400">Profit Margin</div>
@@ -93,7 +93,7 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
         <div className="p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 space-y-2">
           <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-semibold">
             <Package className="w-4 h-4 text-blue-500" />
-            <span>Product Details</span>
+            <span>Product Line & SKU</span>
           </div>
           <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
             {transaction.product_name}
@@ -110,7 +110,7 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
         <div className="p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 space-y-2">
           <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-semibold">
             <User className="w-4 h-4 text-purple-500" />
-            <span>Customer Profile</span>
+            <span>Indian Customer Profile</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="font-semibold text-zinc-900 dark:text-zinc-100">{transaction.customer_name}</span>
@@ -119,7 +119,7 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
             </span>
           </div>
           <div className="text-[11px] text-zinc-500 font-mono">
-            ID: {transaction.customer_id}
+            Customer ID: {transaction.customer_id}
           </div>
         </div>
 
@@ -127,7 +127,7 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
         <div className="p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 space-y-2">
           <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-semibold">
             <Store className="w-4 h-4 text-amber-500" />
-            <span>Fulfillment Location</span>
+            <span>Store Fulfillment Hub</span>
           </div>
           <div className="font-semibold text-zinc-900 dark:text-zinc-100">
             {transaction.store_name}
@@ -142,26 +142,25 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
       {/* Drawer Action Buttons */}
       <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 flex items-center justify-between gap-2">
         <button
-          onClick={() => alert(`Exporting receipt for Order ${transaction.order_id}`)}
+          onClick={() => alert(`Exporting GST invoice for Order ${transaction.order_id}`)}
           className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 font-medium text-xs shadow-sm transition-colors"
         >
           <FileDown className="w-3.5 h-3.5" />
-          <span>Export Summary</span>
+          <span>Export GST Invoice</span>
         </button>
 
         <button
           onClick={() => {
-            alert(`Order ${transaction.order_id} verified in audit ledger!`);
+            alert(`Order ${transaction.order_id} reconciled in ERP audit!`);
             onClose();
           }}
           className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-sm transition-colors"
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>Reconcile Order</span>
+          <span>Reconcile Ledger</span>
         </button>
       </div>
 
     </div>
   );
 };
-

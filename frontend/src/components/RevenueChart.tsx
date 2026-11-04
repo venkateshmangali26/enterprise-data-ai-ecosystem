@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import { RevenueTrendRow } from "../types";
-import { Calendar, TrendingUp } from "lucide-react";
 
 interface RevenueChartProps {
   data: RevenueTrendRow[];
@@ -17,7 +16,6 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
   const [selectedYear, setSelectedYear] = useState<number>(2025);
 
   const filteredData = useMemo(() => {
-    // If specific year selected
     return data.filter((d) => d.year === selectedYear);
   }, [data, selectedYear]);
 
@@ -31,7 +29,6 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
       orders: number;
     }>();
 
-    // Group by month
     filteredData.forEach((row) => {
       const existing = map.get(row.month) || {
         monthName: row.month_short,
@@ -65,13 +62,12 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
 
   const option = useMemo(() => {
     const textColor = isDark ? "#a1a1aa" : "#71717a";
-    const titleColor = isDark ? "#fafafa" : "#09090b";
     const splitLineColor = isDark ? "#1f1f23" : "#f4f4f5";
     const axisLineColor = isDark ? "#27272a" : "#e4e4e7";
 
     const months = monthlyAgg.map((d) => d.monthName);
-    const revenues = monthlyAgg.map((d) => (d.revenue / 1_000_000).toFixed(2));
-    const ytds = monthlyAgg.map((d) => (d.ytd / 1_000_000).toFixed(2));
+    const revenues = monthlyAgg.map((d) => (d.revenue / 10_000_000).toFixed(2)); // in Crores
+    const ytds = monthlyAgg.map((d) => (d.ytd / 10_000_000).toFixed(2)); // in Crores
 
     return {
       backgroundColor: "transparent",
@@ -84,23 +80,26 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
           if (!params || !params.length) return "";
           const idx = params[0].dataIndex;
           const item = monthlyAgg[idx];
+          const isFestivePeak = item.month === 10 || item.month === 11;
           return `
-            <div style="font-weight: 600; margin-bottom: 4px; font-family: monospace;">${item.monthName} ${selectedYear}</div>
+            <div style="font-weight: 600; margin-bottom: 4px; font-family: monospace;">
+              ${item.monthName} ${selectedYear} ${isFestivePeak ? "🪔 (Festive Diwali Peak)" : ""}
+            </div>
             <div style="display:flex; justify-content:space-between; gap:16px;">
-              <span style="color:#60a5fa">● Monthly Revenue:</span>
-              <span style="font-weight:bold">$${(item.revenue / 1_000_000).toFixed(2)}M</span>
+              <span style="color:#f97316">● Monthly GMV:</span>
+              <span style="font-weight:bold">₹${(item.revenue / 10_000_000).toFixed(2)} Cr</span>
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px;">
               <span style="color:#10b981">● Running YTD:</span>
-              <span style="font-weight:bold">$${(item.ytd / 1_000_000).toFixed(2)}M</span>
+              <span style="font-weight:bold">₹${(item.ytd / 10_000_000).toFixed(2)} Cr</span>
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px;">
               <span style="color:${item.momPct >= 0 ? '#10b981' : '#f43f5e'}">● MoM Growth:</span>
               <span style="font-weight:bold">${item.momPct >= 0 ? '+' : ''}${item.momPct}%</span>
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px; margin-top:4px; font-size:11px; color:#a1a1aa">
-              <span>Orders Placed:</span>
-              <span>${item.orders.toLocaleString()}</span>
+              <span>Orders Dispatched:</span>
+              <span>${item.orders.toLocaleString("en-IN")}</span>
             </div>
           `;
         },
@@ -127,22 +126,22 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
       yAxis: [
         {
           type: "value",
-          name: "Monthly ($M)",
+          name: "Monthly (₹ Cr)",
           nameTextStyle: { color: textColor, fontSize: 11 },
           axisLabel: {
             color: textColor,
-            formatter: "${value}M",
+            formatter: "₹{value} Cr",
             fontSize: 10,
           },
           splitLine: { lineStyle: { color: splitLineColor } },
         },
         {
           type: "value",
-          name: "YTD ($M)",
+          name: "YTD (₹ Cr)",
           nameTextStyle: { color: textColor, fontSize: 11 },
           axisLabel: {
             color: textColor,
-            formatter: "${value}M",
+            formatter: "₹{value} Cr",
             fontSize: 10,
           },
           splitLine: { show: false },
@@ -159,8 +158,8 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
               type: "linear",
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: "#3b82f6" },
-                { offset: 1, color: "#1d4ed8" },
+                { offset: 0, color: "#f97316" }, // Indian Saffron/Orange
+                { offset: 1, color: "#ea580c" },
               ],
             },
             borderRadius: [4, 4, 0, 0],
@@ -197,14 +196,14 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50">
-              Query 1: MoM Revenue Growth & Running YTD
+              Query 1: MoM Revenue Growth & Running YTD (₹ Crores)
             </h2>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-              {selectedRegion === "All" ? "All Territories" : `${selectedRegion} Territory`}
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-900">
+              {selectedRegion === "All" ? "Pan-India Territories" : `${selectedRegion} Region`}
             </span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Window calculations tracking seasonal sales velocity and annual cumulative targets.
+            Window calculations tracking festive spikes (Diwali, Dhanteras, Navratri & Wedding season).
           </p>
         </div>
 
@@ -216,11 +215,11 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
               onClick={() => setSelectedYear(y)}
               className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
                 selectedYear === y
-                  ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                  ? "bg-white dark:bg-zinc-800 text-orange-600 dark:text-orange-400 shadow-sm"
                   : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
-              {y}
+              FY {y}
             </button>
           ))}
         </div>
@@ -232,4 +231,3 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
     </div>
   );
 };
-

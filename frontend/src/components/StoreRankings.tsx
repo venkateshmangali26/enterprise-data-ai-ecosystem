@@ -1,6 +1,7 @@
 import React from "react";
 import { TopStoreRow } from "../types";
-import { Award, Store, Layers, TrendingUp } from "lucide-react";
+import { formatINR } from "../utils/formatters";
+import { Award } from "lucide-react";
 
 interface StoreRankingsProps {
   stores: TopStoreRow[];
@@ -34,14 +35,14 @@ export const StoreRankings: React.FC<StoreRankingsProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50">
-                Query 2: Top 10 Stores (Margin & Volume)
+                Query 2: Top 10 Indian Stores (Margin & Volume)
               </h2>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                Efficiency Leaderboard
+                Pan-India Leaderboard
               </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Ranked by profit margin % and unit volume throughput with sales density ($/sqft).
+              Ranked by profit margin % and unit throughput with retail density (₹/sqft).
             </p>
           </div>
           <Award className="w-5 h-5 text-amber-500" />
@@ -57,7 +58,7 @@ export const StoreRankings: React.FC<StoreRankingsProps> = ({
                 <th className="pb-2.5 font-semibold">Format</th>
                 <th className="pb-2.5 font-semibold text-right">Profit Margin</th>
                 <th className="pb-2.5 font-semibold text-right">Units Sold</th>
-                <th className="pb-2.5 font-semibold text-right">Net Revenue</th>
+                <th className="pb-2.5 font-semibold text-right">Net Revenue (GMV)</th>
                 <th className="pb-2.5 font-semibold text-right">Sales / SqFt</th>
               </tr>
             </thead>
@@ -68,7 +69,7 @@ export const StoreRankings: React.FC<StoreRankingsProps> = ({
                   onClick={() => onSelectStore?.(s.store_id)}
                   className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors group"
                 >
-                  <td className="py-2.5 font-mono font-bold text-zinc-400 group-hover:text-blue-500">
+                  <td className="py-2.5 font-mono font-bold text-zinc-400 group-hover:text-orange-500">
                     #{idx + 1}
                   </td>
                   <td className="py-2.5">
@@ -76,7 +77,7 @@ export const StoreRankings: React.FC<StoreRankingsProps> = ({
                       {s.store_name}
                     </div>
                     <div className="text-[11px] text-zinc-500">
-                      {s.city}, {s.state} · <span className="font-mono">{s.region}</span>
+                      {s.city}, {s.state} · <span className="font-mono text-zinc-400">{s.region}</span>
                     </div>
                   </td>
                   <td className="py-2.5">
@@ -96,19 +97,19 @@ export const StoreRankings: React.FC<StoreRankingsProps> = ({
                       <div className="w-12 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                         <div
                           className="h-full bg-emerald-500 rounded-full"
-                          style={{ width: `${Math.min(100, s.profit_margin_pct * 2)}%` }}
+                          style={{ width: `${Math.min(100, s.profit_margin_pct * 2.5)}%` }}
                         />
                       </div>
                     </div>
                   </td>
                   <td className="py-2.5 text-right font-mono text-zinc-700 dark:text-zinc-300">
-                    {s.total_volume_sold?.toLocaleString()}
+                    {s.total_volume_sold?.toLocaleString("en-IN")}
                   </td>
                   <td className="py-2.5 text-right font-mono font-semibold text-zinc-900 dark:text-zinc-100">
-                    ${(s.total_revenue / 1_000).toFixed(0)}k
+                    {formatINR(s.total_revenue)}
                   </td>
-                  <td className="py-2.5 text-right font-mono text-blue-600 dark:text-blue-400">
-                    ${s.revenue_per_sqft}/ft²
+                  <td className="py-2.5 text-right font-mono text-orange-600 dark:text-orange-400">
+                    ₹{s.revenue_per_sqft?.toLocaleString("en-IN")}/ft²
                   </td>
                 </tr>
               ))}
@@ -119,4 +120,3 @@ export const StoreRankings: React.FC<StoreRankingsProps> = ({
     </div>
   );
 };
-

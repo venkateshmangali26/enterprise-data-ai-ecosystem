@@ -1,14 +1,13 @@
 import React from "react";
 import { OverviewKPIs } from "../types";
+import { formatINR, formatINRAmount } from "../utils/formatters";
 import { 
-  DollarSign, 
   TrendingUp, 
   TrendingDown, 
-  ShoppingCart, 
   Users, 
-  Package, 
   Percent, 
-  CreditCard 
+  CreditCard,
+  IndianRupee
 } from "lucide-react";
 
 interface KPICardsProps {
@@ -34,53 +33,47 @@ export const KPICards: React.FC<KPICardsProps> = ({ kpis, isLoading }) => {
     );
   }
 
-  const formatCurrency = (val: number) => {
-    if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
-    if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}k`;
-    return `$${val.toFixed(2)}`;
-  };
-
   const isMomPositive = (kpis.mom_growth_pct ?? 0) >= 0;
 
   const cards = [
     {
-      title: "Total Net Revenue",
-      value: formatCurrency(kpis.total_revenue),
-      subtext: `COGS: ${formatCurrency(kpis.total_cost)}`,
+      title: "Total Net Revenue (GMV)",
+      value: formatINR(kpis.total_revenue),
+      subtext: `Cost of Goods: ${formatINR(kpis.total_cost)}`,
       trend: `${isMomPositive ? "+" : ""}${kpis.mom_growth_pct}% MoM`,
       isPositive: isMomPositive,
-      icon: DollarSign,
+      icon: IndianRupee,
       barPercent: Math.min(100, Math.max(10, Math.round((kpis.gross_profit / kpis.total_revenue) * 100))),
-      barColor: "bg-blue-500",
+      barColor: "bg-orange-500",
     },
     {
       title: "Gross Profit & Margin",
-      value: formatCurrency(kpis.gross_profit),
-      subtext: `${kpis.profit_margin_pct}% Profit Margin`,
+      value: formatINR(kpis.gross_profit),
+      subtext: `${kpis.profit_margin_pct}% Operational Margin`,
       trend: `${kpis.profit_margin_pct}% Margin`,
-      isPositive: kpis.profit_margin_pct >= 35,
+      isPositive: kpis.profit_margin_pct >= 25,
       icon: Percent,
-      barPercent: Math.min(100, Math.round(kpis.profit_margin_pct * 1.3)),
+      barPercent: Math.min(100, Math.round(kpis.profit_margin_pct * 2)),
       barColor: "bg-emerald-500",
     },
     {
       title: "Average Order Value (AOV)",
-      value: `$${kpis.average_order_value?.toFixed(2) ?? "0.00"}`,
-      subtext: `${kpis.total_orders?.toLocaleString()} Total Orders`,
+      value: formatINRAmount(kpis.average_order_value),
+      subtext: `${(kpis.total_orders || 0).toLocaleString("en-IN")} Total Orders`,
       trend: `${(kpis.total_units_sold / (kpis.total_orders || 1)).toFixed(1)} Items/Order`,
       isPositive: true,
       icon: CreditCard,
-      barPercent: Math.min(100, Math.round((kpis.average_order_value / 250) * 100)),
-      barColor: "bg-amber-500",
+      barPercent: Math.min(100, Math.round((kpis.average_order_value / 50000) * 100)),
+      barColor: "bg-blue-500",
     },
     {
       title: "Active Customer Base",
-      value: kpis.active_customers?.toLocaleString() ?? "0",
+      value: (kpis.active_customers || 0).toLocaleString("en-IN"),
       subtext: `${(kpis.total_orders / (kpis.active_customers || 1)).toFixed(1)} Orders / Customer`,
-      trend: `${kpis.avg_discount_pct}% Avg Discount`,
+      trend: `${kpis.avg_discount_pct}% Avg Festive Disc`,
       isPositive: true,
       icon: Users,
-      barPercent: 78,
+      barPercent: 82,
       barColor: "bg-purple-500",
     },
   ];
@@ -147,4 +140,3 @@ export const KPICards: React.FC<KPICardsProps> = ({ kpis, isLoading }) => {
     </div>
   );
 };
-

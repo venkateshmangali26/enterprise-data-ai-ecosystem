@@ -3,63 +3,69 @@ import { db, initDatabaseSchema } from "./db";
 console.log("⚡ Initializing Star Schema Database tables...");
 initDatabaseSchema();
 
-// Check if data already exists
-const countResult = db.query("SELECT COUNT(*) as count FROM fact_transactions").get() as { count: number };
-if (countResult && countResult.count > 0) {
-  console.log(`Database already seeded with ${countResult.count.toLocaleString()} transactions. Skipping seed.`);
-  process.exit(0);
-}
+// Reset existing data to allow fresh Indian retail seeding
+console.log("🧹 Clearing old tables for Indian retail ecosystem...");
+db.run("DELETE FROM fact_transactions");
+db.run("DELETE FROM dim_calendar");
+db.run("DELETE FROM dim_customers");
+db.run("DELETE FROM dim_products");
+db.run("DELETE FROM dim_stores");
 
-console.log("🌱 Starting Star Schema Data Generation & Database Seeding...");
+console.log("🌱 Starting Indian Retail Star Schema Data Generation & Seeding...");
 const startTime = performance.now();
 
 // -----------------------------------------------------------------------------
-// 1. SEED DIM_STORES (38 Stores)
+// 1. SEED DIM_STORES (38 Stores across Indian Metros & Growth Hubs)
 // -----------------------------------------------------------------------------
-console.log("[1/5] Seeding Dim_Stores (38 stores)...");
+console.log("[1/5] Seeding Dim_Stores (38 Indian stores across 5 regions)...");
 const storeLocations = [
-  // East Region
-  { city: "New York", state: "NY", region: "East", type: "Flagship", sqft: 45000 },
-  { city: "Boston", state: "MA", region: "East", type: "Standard", sqft: 22000 },
-  { city: "Philadelphia", state: "PA", region: "East", type: "Standard", sqft: 25000 },
-  { city: "Pittsburgh", state: "PA", region: "East", type: "Mall", sqft: 18000 },
-  { city: "Baltimore", state: "MD", region: "East", type: "Express", sqft: 9500 },
-  { city: "Newark", state: "NJ", region: "East", type: "Outlet", sqft: 32000 },
-  { city: "Hartford", state: "CT", region: "East", type: "Express", sqft: 8500 },
-  { city: "Providence", state: "RI", region: "East", type: "Mall", sqft: 16000 },
-  { city: "Buffalo", state: "NY", region: "East", type: "Outlet", sqft: 28000 },
-  // West Region
-  { city: "Los Angeles", state: "CA", region: "West", type: "Flagship", sqft: 52000 },
-  { city: "San Francisco", state: "CA", region: "West", type: "Flagship", sqft: 38000 },
-  { city: "Seattle", state: "WA", region: "West", type: "Standard", sqft: 26000 },
-  { city: "Portland", state: "OR", region: "West", type: "Standard", sqft: 21000 },
-  { city: "San Diego", state: "CA", region: "West", type: "Standard", sqft: 24000 },
-  { city: "San Jose", state: "CA", region: "West", type: "Mall", sqft: 19500 },
-  { city: "Phoenix", state: "AZ", region: "West", type: "Outlet", sqft: 34000 },
-  { city: "Denver", state: "CO", region: "West", type: "Standard", sqft: 25000 },
-  { city: "Las Vegas", state: "NV", region: "West", type: "Outlet", sqft: 36000 },
-  { city: "Salt Lake City", state: "UT", region: "West", type: "Express", sqft: 9000 },
-  // Midwest Region
-  { city: "Chicago", state: "IL", region: "Midwest", type: "Flagship", sqft: 48000 },
-  { city: "Detroit", state: "MI", region: "Midwest", type: "Standard", sqft: 23000 },
-  { city: "Minneapolis", state: "MN", region: "Midwest", type: "Standard", sqft: 22500 },
-  { city: "Cleveland", state: "OH", region: "Midwest", type: "Mall", sqft: 17500 },
-  { city: "Columbus", state: "OH", region: "Midwest", type: "Standard", sqft: 20000 },
-  { city: "Indianapolis", state: "IN", region: "Midwest", type: "Standard", sqft: 19000 },
-  { city: "Milwaukee", state: "WI", region: "Midwest", type: "Outlet", sqft: 29000 },
-  { city: "Kansas City", state: "MO", region: "Midwest", type: "Mall", sqft: 18500 },
-  { city: "St. Louis", state: "MO", region: "Midwest", type: "Outlet", sqft: 31000 },
+  // North Region
+  { city: "New Delhi", state: "DL", region: "North", type: "Flagship", sqft: 45000, landmark: "Connaught Place" },
+  { city: "Gurgaon", state: "HR", region: "North", type: "Flagship", sqft: 38000, landmark: "CyberHub" },
+  { city: "Noida", state: "UP", region: "North", type: "Mall", sqft: 32000, landmark: "Mall of India" },
+  { city: "Chandigarh", state: "CH", region: "North", type: "Standard", sqft: 22000, landmark: "Sector 17 High Street" },
+  { city: "Jaipur", state: "RJ", region: "North", type: "Standard", sqft: 20000, landmark: "MI Road" },
+  { city: "Lucknow", state: "UP", region: "North", type: "Mall", sqft: 24000, landmark: "Hazratganj Phoenix Mall" },
+  { city: "Ludhiana", state: "PB", region: "North", type: "Outlet", sqft: 18000, landmark: "Ferozepur Road" },
+  { city: "Dehradun", state: "UK", region: "North", type: "Express", sqft: 8500, landmark: "Rajpur Road" },
+
   // South Region
-  { city: "Dallas", state: "TX", region: "South", type: "Flagship", sqft: 50000 },
-  { city: "Houston", state: "TX", region: "South", type: "Flagship", sqft: 46000 },
-  { city: "Austin", state: "TX", region: "South", type: "Standard", sqft: 24000 },
-  { city: "Atlanta", state: "GA", region: "South", type: "Flagship", sqft: 42000 },
-  { city: "Miami", state: "FL", region: "South", type: "Standard", sqft: 28000 },
-  { city: "Orlando", state: "FL", region: "South", type: "Outlet", sqft: 35000 },
-  { city: "Charlotte", state: "NC", region: "South", type: "Standard", sqft: 22000 },
-  { city: "Nashville", state: "TN", region: "South", type: "Mall", sqft: 19000 },
-  { city: "New Orleans", state: "LA", region: "South", type: "Express", sqft: 8800 },
-  { city: "Tampa", state: "FL", region: "South", type: "Mall", sqft: 20500 },
+  { city: "Bengaluru", state: "KA", region: "South", type: "Flagship", sqft: 52000, landmark: "Indiranagar 100ft Rd" },
+  { city: "Bengaluru", state: "KA", region: "South", type: "Mall", sqft: 35000, landmark: "Whitefield Phoenix Mall" },
+  { city: "Bengaluru", state: "KA", region: "South", type: "Standard", sqft: 24000, landmark: "Koramangala 80ft Rd" },
+  { city: "Hyderabad", state: "TS", region: "South", type: "Flagship", sqft: 48000, landmark: "Jubilee Hills Road 36" },
+  { city: "Hyderabad", state: "TS", region: "South", type: "Standard", sqft: 26000, landmark: "Hitec City Inorbit" },
+  { city: "Chennai", state: "TN", region: "South", type: "Mall", sqft: 36000, landmark: "Express Avenue Royapettah" },
+  { city: "Chennai", state: "TN", region: "South", type: "Standard", sqft: 22000, landmark: "T. Nagar Usman Road" },
+  { city: "Kochi", state: "KL", region: "South", type: "Mall", sqft: 32000, landmark: "Lulu International Mall" },
+  { city: "Coimbatore", state: "TN", region: "South", type: "Standard", sqft: 19000, landmark: "Brookefields Mall" },
+  { city: "Visakhapatnam", state: "AP", region: "South", type: "Express", sqft: 9500, landmark: "VIP Road Siripuram" },
+
+  // West Region
+  { city: "Mumbai", state: "MH", region: "West", type: "Flagship", sqft: 50000, landmark: "Bandra Linking Road" },
+  { city: "Mumbai", state: "MH", region: "West", type: "Mall", sqft: 42000, landmark: "Lower Parel Phoenix Palladium" },
+  { city: "Mumbai", state: "MH", region: "West", type: "Outlet", sqft: 28000, landmark: "Thane Viviana Mall" },
+  { city: "Pune", state: "MH", region: "West", type: "Mall", sqft: 36000, landmark: "Viman Nagar Phoenix Marketcity" },
+  { city: "Pune", state: "MH", region: "West", type: "Standard", sqft: 23000, landmark: "FC Road High Street" },
+  { city: "Ahmedabad", state: "GJ", region: "West", type: "Mall", sqft: 34000, landmark: "Vastrapur Ahmedabad One" },
+  { city: "Ahmedabad", state: "GJ", region: "West", type: "Standard", sqft: 21000, landmark: "CG Road" },
+  { city: "Surat", state: "GJ", region: "West", type: "Mall", sqft: 27000, landmark: "VR Mall Dumas Road" },
+  { city: "Vadodara", state: "GJ", region: "West", type: "Standard", sqft: 19500, landmark: "Alkapuri" },
+  { city: "Goa", state: "GA", region: "West", type: "Express", sqft: 11000, landmark: "Panjim MG Road" },
+
+  // East Region
+  { city: "Kolkata", state: "WB", region: "East", type: "Flagship", sqft: 42000, landmark: "South City Mall" },
+  { city: "Kolkata", state: "WB", region: "East", type: "Standard", sqft: 25000, landmark: "Park Street Heritage" },
+  { city: "Bhubaneswar", state: "OD", region: "East", type: "Mall", sqft: 22000, landmark: "Esplanade One Rasulgarh" },
+  { city: "Patna", state: "BR", region: "East", type: "Mall", sqft: 20000, landmark: "City Centre Mall Frazer Rd" },
+  { city: "Guwahati", state: "AS", region: "East", type: "Standard", sqft: 18000, landmark: "GS Road Christian Basti" },
+  { city: "Ranchi", state: "JH", region: "East", type: "Mall", sqft: 16500, landmark: "Nucleus Mall Circular Rd" },
+
+  // Central Region
+  { city: "Indore", state: "MP", region: "Central", type: "Mall", sqft: 26000, landmark: "Treasure Island MG Road" },
+  { city: "Bhopal", state: "MP", region: "Central", type: "Mall", sqft: 23000, landmark: "DB City Mall Arera Hills" },
+  { city: "Nagpur", state: "MH", region: "Central", type: "Standard", sqft: 21000, landmark: "Empress City Mall" },
+  { city: "Raipur", state: "CG", region: "Central", type: "Outlet", sqft: 19000, landmark: "Magneto The Mall" },
 ];
 
 const insertStore = db.prepare(`
@@ -73,7 +79,7 @@ const storeSqfts: number[] = [];
 db.transaction(() => {
   storeLocations.forEach((s, idx) => {
     const storeId = `STR-${String(idx + 1).padStart(3, "0")}`;
-    const storeName = `${s.city} ${s.type} Store`;
+    const storeName = `${s.city} ${s.landmark} (${s.type})`;
     const openDate = `201${5 + (idx % 6)}-${String((idx % 12) + 1).padStart(2, "0")}-15`;
     insertStore.run(storeId, storeName, s.city, s.state, s.region, s.type, s.sqft, openDate);
     storeIds.push(storeId);
@@ -82,49 +88,49 @@ db.transaction(() => {
 })();
 
 // -----------------------------------------------------------------------------
-// 2. SEED DIM_PRODUCTS (250 Products across 5 Categories)
+// 2. SEED DIM_PRODUCTS (250 Products across 5 Indian Retail Categories)
 // -----------------------------------------------------------------------------
-console.log("[2/5] Seeding Dim_Products (250 products)...");
+console.log("[2/5] Seeding Dim_Products (250 Indian products in INR ₹)...");
 const categoriesConfig = [
   {
-    name: "Electronics",
-    subcategories: ["Smartphones", "Audio", "Laptops & Tablets", "Wearables", "Accessories"],
-    count: 55,
-    costRange: [35.0, 950.0],
-    marginRange: [0.18, 0.35],
-    prefixes: ["Pro", "Ultra", "Max", "Quantum", "Pulse", "Sonic", "Apex"],
+    name: "Ethnic & Modern Apparel",
+    subcategories: ["Kurtas & Sherwanis", "Sarees & Lehengas", "Formal & Chinos", "Footwear & Mojaris", "Athleisure"],
+    count: 60,
+    costRange: [450.0, 5200.0], // in ₹
+    marginRange: [0.45, 0.68],
+    prefixes: ["Banarasi", "Kanjeevaram", "FabHeritage", "RoyalSilk", "VedicWeave", "MetroStyle", "KhadiPure"],
   },
   {
-    name: "Apparel",
-    subcategories: ["Men's Wear", "Women's Wear", "Footwear", "Outerwear", "Athletic"],
-    count: 60,
-    costRange: [8.0, 85.0],
-    marginRange: [0.45, 0.68],
-    prefixes: ["Classic", "Comfort", "Heritage", "Modern", "Essential", "Breeze"],
+    name: "Electronics & Gadgets",
+    subcategories: ["5G Smartphones", "TWS Earbuds & Audio", "Laptops & Tablets", "Smart Fitness Bands", "Smart Home Tech"],
+    count: 55,
+    costRange: [1800.0, 68000.0], // in ₹
+    marginRange: [0.18, 0.32],
+    prefixes: ["BharatPro", "SonicPulse", "VoltMax", "Optima", "QuantumX", "AeroSound", "NexGen"],
   },
   {
     name: "Home & Kitchen",
-    subcategories: ["Cookware", "Small Appliances", "Bedding", "Decor", "Storage"],
+    subcategories: ["Tri-Ply Cookware", "Mixer Grinders & Inductions", "Pooja Brassware", "Pure Cotton Bedsheets", "Copper & Tableware"],
     count: 50,
-    costRange: [12.0, 180.0],
-    marginRange: [0.40, 0.60],
-    prefixes: ["Artisan", "Culinary", "EcoHome", "Pure", "Haven", "Gourmet"],
+    costRange: [650.0, 8500.0], // in ₹
+    marginRange: [0.38, 0.58],
+    prefixes: ["SwachhHome", "ShreeCraft", "BrassHeritage", "IndusCook", "PureComfort", "VedicCopper"],
   },
   {
-    name: "Sports",
-    subcategories: ["Fitness Equipment", "Outdoor Gear", "Team Sports", "Cycling", "Yoga"],
+    name: "Personal Care & Ayurveda",
+    subcategories: ["Kumkumadi & Serums", "Bhringraj Hair Care", "Sandalwood & Attars", "Herbal Wellness", "Bath & Body"],
     count: 45,
-    costRange: [10.0, 240.0],
-    marginRange: [0.35, 0.55],
-    prefixes: ["Apex", "Velocity", "Summit", "Dynamic", "ProForm", "Endure"],
+    costRange: [220.0, 2800.0], // in ₹
+    marginRange: [0.55, 0.80],
+    prefixes: ["AyurPure", "ForestEssence", "KamaGlow", "VedaNaturals", "RasaOrganics", "DivyaHerbs"],
   },
   {
-    name: "Beauty",
-    subcategories: ["Skincare", "Haircare", "Fragrance", "Makeup", "Bath & Body"],
+    name: "Sports & Fitness",
+    subcategories: ["Cricket Bats & Gear", "Badminton & Racquets", "Yoga Mats & Props", "Whey Protein & Nutrition", "Home Gym Gear"],
     count: 40,
-    costRange: [5.0, 65.0],
-    marginRange: [0.55, 0.80],
-    prefixes: ["Radiance", "Luxe", "Botanical", "Glow", "Derma", "Silk"],
+    costRange: [450.0, 9500.0], // in ₹
+    marginRange: [0.35, 0.55],
+    prefixes: ["KashmirWillow", "ApexSport", "YogiBalance", "ProStamina", "GripMaster", "FitVeda"],
   },
 ];
 
@@ -150,11 +156,11 @@ db.transaction(() => {
       const prodId = `PRD-${String(prodCounter).padStart(4, "0")}`;
       const subCat = cat.subcategories[i % cat.subcategories.length];
       const prefix = cat.prefixes[i % cat.prefixes.length];
-      const prodName = `${prefix} ${subCat.replace(/s$/, "")} ${i + 1}`;
+      const prodName = `${prefix} ${subCat.replace(/s$/, "")} Edition ${i + 1}`;
       
-      const cost = Math.round((cat.costRange[0] + Math.random() * (cat.costRange[1] - cat.costRange[0])) * 100) / 100;
+      const cost = Math.round(cat.costRange[0] + Math.random() * (cat.costRange[1] - cat.costRange[0]));
       const margin = cat.marginRange[0] + Math.random() * (cat.marginRange[1] - cat.marginRange[0]);
-      const retail = Math.round((cost / (1 - margin)) * 100) / 100;
+      const retail = Math.round(cost / (1 - margin));
 
       insertProduct.run(prodId, prodName, cat.name, subCat, cost, retail);
       productsList.push({ id: prodId, name: prodName, category: cat.name, subCategory: subCat, unitCost: cost, retailPrice: retail });
@@ -164,14 +170,41 @@ db.transaction(() => {
 })();
 
 // -----------------------------------------------------------------------------
-// 3. SEED DIM_CUSTOMERS (10,000 Customers)
+// 3. SEED DIM_CUSTOMERS (10,000 Indian Customers)
 // -----------------------------------------------------------------------------
-console.log("[3/5] Seeding Dim_Customers (10,000 customers)...");
-const firstNames = ["James", "Mary", "Robert", "Patricia", "John", "Jennifer", "Michael", "Linda", "David", "Sarah", "William", "Karen", "Thomas", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Sandra"];
-const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Wilson", "Anderson", "Taylor", "Thomas", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White", "Harris"];
-const custStates = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA", "NC", "MI", "WA", "CO", "NJ", "VA", "AZ"];
-const segments = ["Consumer", "Corporate", "Home Office"];
-const segmentWeights = [0.65, 0.25, 0.10];
+console.log("[3/5] Seeding Dim_Customers (10,000 Indian customers)...");
+const firstNames = [
+  "Aarav", "Rohan", "Priya", "Ananya", "Rajesh", "Suresh", "Deepa", "Vikram", "Neha", "Venkatesh",
+  "Lakshmi", "Karthik", "Sneha", "Aditya", "Pooja", "Amit", "Meera", "Arjun", "Rahul", "Sunita",
+  "Divya", "Manoj", "Swati", "Rakesh", "Tanvi", "Harish", "Anjali", "Gaurav", "Kavita", "Nikhil",
+  "Manish", "Bhavna", "Kunal", "Pallavi", "Vivek", "Shreya", "Ashok", "Preeti", "Sanjay", "Ritu"
+];
+const lastNames = [
+  "Sharma", "Verma", "Patel", "Reddy", "Iyer", "Nair", "Gupta", "Rao", "Chatterjee", "Singh",
+  "Joshi", "Deshmukh", "Kulkarni", "Mukherjee", "Agarwal", "Mehta", "Nambiar", "Pillai", "Bhat", "Choudhury",
+  "Banerjee", "Menon", "Saxena", "Chauhan", "Mishra", "Trivedi", "Shetty", "Gowda", "Yadav", "Pandey"
+];
+const custStates = [
+  "Maharashtra", "Karnataka", "Telangana", "Tamil Nadu", "Delhi NCR", "Gujarat",
+  "Uttar Pradesh", "West Bengal", "Rajasthan", "Kerala", "Madhya Pradesh", "Punjab", "Andhra Pradesh"
+];
+const statePincodes: Record<string, number> = {
+  Maharashtra: 400001,
+  Karnataka: 560001,
+  Telangana: 500001,
+  "Tamil Nadu": 600001,
+  "Delhi NCR": 110001,
+  Gujarat: 380001,
+  "Uttar Pradesh": 226001,
+  "West Bengal": 700001,
+  Rajasthan: 302001,
+  Kerala: 682001,
+  "Madhya Pradesh": 452001,
+  Punjab: 141001,
+  "Andhra Pradesh": 530001,
+};
+
+const segments = ["Retail Consumer", "Corporate & Enterprise", "SME & Kirana"];
 
 const insertCustomer = db.prepare(`
   INSERT INTO dim_customers (customer_id, first_name, last_name, email, segment, state, postal_code, signup_date)
@@ -186,28 +219,30 @@ db.transaction(() => {
     const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
     const ln = lastNames[Math.floor(Math.random() * lastNames.length)];
     const randSeg = Math.random();
-    const seg = randSeg < 0.65 ? segments[0] : randSeg < 0.90 ? segments[1] : segments[2];
+    const seg = randSeg < 0.68 ? segments[0] : randSeg < 0.88 ? segments[1] : segments[2];
     const st = custStates[Math.floor(Math.random() * custStates.length)];
-    const email = `${fn.toLowerCase()}.${ln.toLowerCase()}${i}@${seg === "Consumer" ? "example.com" : "corp-retail.org"}`;
-    const zip = String(10000 + Math.floor(Math.random() * 89999));
+    const basePin = statePincodes[st] || 560001;
+    const pin = String(basePin + Math.floor(Math.random() * 50));
+    const domain = seg === "Retail Consumer" ? "gmail.com" : seg === "Corporate & Enterprise" ? "tcs-enterprise.in" : "kirana-network.in";
+    const email = `${fn.toLowerCase()}.${ln.toLowerCase()}${i}@${domain}`;
     const signupDaysAgo = Math.floor(Math.random() * 1500);
     const signupDate = new Date(Date.now() - signupDaysAgo * 86400000).toISOString().split("T")[0];
 
-    insertCustomer.run(custId, fn, ln, email, seg, st, zip, signupDate);
+    insertCustomer.run(custId, fn, ln, email, seg, st, pin, signupDate);
     customerIds.push(custId);
   }
 })();
 
 // -----------------------------------------------------------------------------
-// 4. SEED DIM_CALENDAR (3 Years: 2023-01-01 to 2025-12-31)
+// 4. SEED DIM_CALENDAR (3 Years: 2023-01-01 to 2025-12-31 with Indian Fiscal Year)
 // -----------------------------------------------------------------------------
-console.log("[4/5] Seeding Dim_Calendar (2023 - 2025)...");
+console.log("[4/5] Seeding Dim_Calendar (2023 - 2025 Indian Financial Years)...");
 const insertCalendar = db.prepare(`
   INSERT INTO dim_calendar (date_key, date, year, quarter, quarter_name, month, month_name, month_short, day, day_of_week, day_name, is_weekend, fiscal_quarter, fiscal_year)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
-const calendarDays: { dateKey: number; dateStr: string; month: number; isWeekend: boolean }[] = [];
+const calendarDays: { dateKey: number; dateStr: string; month: number; day: number; isWeekend: boolean }[] = [];
 const startDate = new Date(2023, 0, 1);
 const endDate = new Date(2025, 11, 31);
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -220,26 +255,29 @@ db.transaction(() => {
     const y = curr.getFullYear();
     const m = curr.getMonth() + 1; // 1-12
     const d = curr.getDate();
-    const dow = curr.getDay(); // 0 = Sunday, 6 = Saturday
+    const dow = curr.getDay();
     const isWknd = dow === 0 || dow === 6 ? 1 : 0;
     const q = Math.ceil(m / 3);
     const dateKey = y * 10000 + m * 100 + d;
     const dateStr = curr.toISOString().split("T")[0];
     const qName = `Q${q} ${y}`;
-    const fq = m in [2, 3, 4] ? "FQ1" : m in [5, 6, 7] ? "FQ2" : m in [8, 9, 10] ? "FQ3" : "FQ4";
-    const fy = m >= 2 ? y : y - 1;
+    
+    // Indian Fiscal Year: April 1 to March 31
+    // Q1: Apr-Jun | Q2: Jul-Sep | Q3: Oct-Dec | Q4: Jan-Mar
+    const fq = m in [4, 5, 6] ? "FY-Q1" : m in [7, 8, 9] ? "FY-Q2" : m in [10, 11, 12] ? "FY-Q3" : "FY-Q4";
+    const fy = m >= 4 ? y : y - 1;
 
     insertCalendar.run(dateKey, dateStr, y, q, qName, m, monthNames[m - 1], monthShorts[m - 1], d, dow === 0 ? 7 : dow, dayNames[dow], isWknd, fq, fy);
-    calendarDays.push({ dateKey, dateStr, month: m, isWeekend: isWknd === 1 });
+    calendarDays.push({ dateKey, dateStr, month: m, day: d, isWeekend: isWknd === 1 });
     curr.setDate(curr.getDate() + 1);
   }
 })();
 
 // -----------------------------------------------------------------------------
-// 5. SEED FACT_TRANSACTIONS (150,000 High-Throughput Rows with Seasonality)
+// 5. SEED FACT_TRANSACTIONS (150,000 Rows with Indian Festive Surges)
 // -----------------------------------------------------------------------------
 const TOTAL_TXNS = 150000;
-console.log(`[5/5] Seeding Fact_Transactions (${TOTAL_TXNS.toLocaleString()} rows with realistic seasonal spikes)...`);
+console.log(`[5/5] Seeding Fact_Transactions (${TOTAL_TXNS.toLocaleString()} rows with Diwali & Festive Season surges)...`);
 
 const insertFact = db.prepare(`
   INSERT INTO fact_transactions (
@@ -249,16 +287,34 @@ const insertFact = db.prepare(`
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
-// Month multipliers
+// Indian festive month multipliers:
+// October / November: Diwali, Dhanteras, Navratri, Durga Puja, Bhai Dooj & Big Festive Sales (2.7x - 2.9x)
+// December / January: Wedding Season, Makar Sankranti & Winter Sales (1.5x - 1.8x)
+// August: Independence Day Mega Sale & Raksha Bandhan (1.3x)
+// April / May: Akshaya Tritiya, Ugadi & Summer Sales (1.2x)
 const monthWeights: Record<number, number> = {
-  1: 0.75, 2: 0.8, 3: 0.95, 4: 0.9, 5: 1.0, 6: 1.05,
-  7: 1.25, 8: 1.1, 9: 0.95, 10: 1.15, 11: 2.10, 12: 2.45,
+  1: 0.90,  // Sankranti / Pongal sales
+  2: 0.95,  // Wedding season phase 1
+  3: 0.85,  // Fiscal year close
+  4: 1.15,  // Akshaya Tritiya & Ugadi
+  5: 1.25,  // Summer holiday rush
+  6: 0.90,  // Monsoon start
+  7: 0.80,  // Monsoon slump
+  8: 1.30,  // Independence Day & Raksha Bandhan
+  9: 1.55,  // Ganesh Chaturthi & Navratri start
+  10: 2.75, // Diwali, Dussehra, Dhanteras, Durga Puja!
+  11: 2.85, // Diwali week, Wedding season & Black Friday Indian edition
+  12: 1.70, // Christmas, New Year & Winter Wedding peak
 };
 
-// Compute cumulative calendar weights
+// Compute cumulative calendar weights with Dhanteras & Diwali boosts
 const calWeights = calendarDays.map((c) => {
   let w = monthWeights[c.month];
-  if (c.isWeekend) w *= 1.4;
+  if (c.isWeekend) w *= 1.45; // High weekend mall footfalls in Indian metros
+  // High festive days in Oct/Nov
+  if ((c.month === 10 || c.month === 11) && c.day >= 12 && c.day <= 25) {
+    w *= 1.65; // Peak Dhanteras/Diwali gifting window
+  }
   return w;
 });
 const totalCalWeight = calWeights.reduce((a, b) => a + b, 0);
@@ -279,15 +335,16 @@ function getRandomCalendarDay() {
   return calendarDays[low];
 }
 
-// Category product distribution: Apparel (35%), Beauty (25%), Home (20%), Sports (12%), Electronics (8%)
+// Indian category volume weights:
+// Ethnic Apparel (36%), Electronics (24%), Personal Care/Ayurveda (18%), Home/Kitchen (14%), Sports (8%)
 const categoryWeights: Record<string, number> = {
-  Apparel: 0.35,
-  Beauty: 0.25,
-  "Home & Kitchen": 0.20,
-  Sports: 0.12,
-  Electronics: 0.08,
+  "Ethnic & Modern Apparel": 0.36,
+  "Electronics & Gadgets": 0.24,
+  "Personal Care & Ayurveda": 0.18,
+  "Home & Kitchen": 0.14,
+  "Sports & Fitness": 0.08,
 };
-const productWeights = productsList.map((p) => categoryWeights[p.category]);
+const productWeights = productsList.map((p) => categoryWeights[p.category] || 0.1);
 const totalProdWeight = productWeights.reduce((a, b) => a + b, 0);
 const prodCumProb = productWeights.reduce((acc: number[], curr, idx) => {
   const prev = idx === 0 ? 0 : acc[idx - 1];
@@ -327,15 +384,13 @@ function getRandomStore() {
 
 // Customer Pareto distribution (Power law skew)
 function getRandomCustomer() {
-  // Power skew: r^2.2 concentrates transactions on top 20%
   const rank = Math.floor(Math.pow(Math.random(), 2.2) * customerIds.length);
   return customerIds[Math.min(rank, customerIds.length - 1)];
 }
 
 const quantities = [1, 1, 1, 2, 2, 3, 4, 5];
-const discountRates = [0.0, 0.0, 0.05, 0.10, 0.15, 0.20];
+const discountRates = [0.0, 0.0, 0.05, 0.10, 0.15, 0.20, 0.25];
 
-// Insert in chunks of 5000 in transactions
 const BATCH_SIZE = 5000;
 let txCount = 0;
 
@@ -353,18 +408,17 @@ for (let batch = 0; batch < TOTAL_TXNS; batch += BATCH_SIZE) {
       const qty = quantities[Math.floor(Math.random() * quantities.length)];
       const discPct = discountRates[Math.floor(Math.random() * discountRates.length)];
       
-      const extPrice = Math.round(prod.retailPrice * qty * 100) / 100;
-      const discAmt = Math.round(extPrice * discPct * 100) / 100;
-      const netRev = Math.round((extPrice - discAmt) * 100) / 100;
-      const totCost = Math.round(prod.unitCost * qty * 100) / 100;
-      const profit = Math.round((netRev - totCost) * 100) / 100;
-      const shipping = qty <= 2 ? 4.99 : 9.99;
-      const actualShipping = Math.random() < 0.25 ? 0.0 : shipping;
+      const extPrice = Math.round(prod.retailPrice * qty);
+      const discAmt = Math.round(extPrice * discPct);
+      const netRev = extPrice - discAmt;
+      const totCost = Math.round(prod.unitCost * qty);
+      const profit = netRev - totCost;
+      const shipping = netRev >= 999 ? 0.0 : (qty <= 2 ? 49.0 : 99.0); // ₹49 or ₹99; free delivery >= ₹999
 
       insertFact.run(
         txId, orderId, cal.dateStr, cal.dateKey, storeId, prod.id, custId,
         qty, prod.retailPrice, prod.unitCost, discPct, discAmt, netRev,
-        totCost, profit, actualShipping
+        totCost, profit, shipping
       );
       txCount++;
     }
@@ -372,5 +426,4 @@ for (let batch = 0; batch < TOTAL_TXNS; batch += BATCH_SIZE) {
 }
 
 const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
-console.log(`✅ Seeding Complete! Loaded ${txCount.toLocaleString()} transactions across Star Schema in ${elapsed}s.`);
-
+console.log(`✅ Indian Retail Seeding Complete! Loaded ${txCount.toLocaleString()} transactions across Star Schema in ${elapsed}s.`);

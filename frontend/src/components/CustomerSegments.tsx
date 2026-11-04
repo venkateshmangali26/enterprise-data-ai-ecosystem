@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { RFMSegmentRow } from "../types";
-import { Users2, ShieldCheck, HeartHandshake, AlertTriangle, Moon } from "lucide-react";
+import { formatINR } from "../utils/formatters";
+import { Users2 } from "lucide-react";
 
 interface CustomerSegmentsProps {
   segments: RFMSegmentRow[];
@@ -30,7 +31,7 @@ export const CustomerSegments: React.FC<CustomerSegmentsProps> = ({
     const subColor = isDark ? "#a1a1aa" : "#71717a";
 
     const colors = [
-      "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", 
+      "#f97316", "#10b981", "#8b5cf6", "#3b82f6", 
       "#ec4899", "#ef4444", "#64748b", "#06b6d4"
     ];
 
@@ -52,8 +53,8 @@ export const CustomerSegments: React.FC<CustomerSegmentsProps> = ({
         formatter: (p: any) => {
           return `
             <div style="font-weight:600; font-family:monospace;">${p.name}</div>
-            <div style="margin-top:4px;">Revenue: <b>$${(p.value / 1_000_000).toFixed(2)}M</b> (${p.percent}%)</div>
-            <div>Customers: <b>${p.data.customers.toLocaleString()}</b> (${p.data.customerShare}%)</div>
+            <div style="margin-top:4px;">Revenue: <b>₹${(p.value / 10_000_000).toFixed(2)} Cr</b> (${p.percent}%)</div>
+            <div>Customers: <b>${p.data.customers.toLocaleString("en-IN")}</b> (${p.data.customerShare}%)</div>
           `;
         },
       },
@@ -101,14 +102,14 @@ export const CustomerSegments: React.FC<CustomerSegmentsProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50">
-              Query 3: Customer RFM Segmentation
+              Query 3: Pan-India Customer RFM Segmentation
             </h2>
             <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-              Behavioral Quintiles
+              10,000 Verified Profiles
             </span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Recency (days), Frequency (orders), and Monetary (spend) profiling across 10,000 customers.
+            Recency (days), Frequency (orders), and Monetary (spend in ₹) profiling across Indian consumers & businesses.
           </p>
         </div>
         <Users2 className="w-5 h-5 text-purple-500" />
@@ -132,7 +133,7 @@ export const CustomerSegments: React.FC<CustomerSegmentsProps> = ({
                   <span>{segmentIcons[seg.rfm_segment] || "👤"}</span>
                   {seg.rfm_segment}
                 </span>
-                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300">
+                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/80 text-orange-700 dark:text-orange-300">
                   {seg.revenue_contribution_pct}% Rev
                 </span>
               </div>
@@ -140,7 +141,7 @@ export const CustomerSegments: React.FC<CustomerSegmentsProps> = ({
               <div className="grid grid-cols-3 gap-1 text-[11px] font-mono text-zinc-500 dark:text-zinc-400 mt-1 pt-1 border-t border-zinc-100 dark:border-zinc-800/60">
                 <div>
                   <div className="text-[10px] text-zinc-400">Custs</div>
-                  <div className="font-semibold text-zinc-800 dark:text-zinc-200">{seg.total_customers}</div>
+                  <div className="font-semibold text-zinc-800 dark:text-zinc-200">{seg.total_customers.toLocaleString("en-IN")}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-zinc-400">Recency</div>
@@ -148,7 +149,7 @@ export const CustomerSegments: React.FC<CustomerSegmentsProps> = ({
                 </div>
                 <div>
                   <div className="text-[10px] text-zinc-400">Avg Spend</div>
-                  <div className="font-semibold text-zinc-800 dark:text-zinc-200">${(seg.avg_monetary_spend / 1000).toFixed(1)}k</div>
+                  <div className="font-semibold text-zinc-800 dark:text-zinc-200">{formatINR(seg.avg_monetary_spend)}</div>
                 </div>
               </div>
             </div>
@@ -158,4 +159,3 @@ export const CustomerSegments: React.FC<CustomerSegmentsProps> = ({
     </div>
   );
 };
-

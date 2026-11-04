@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { CategoryFinancialRow } from "../types";
+import { formatINR } from "../utils/formatters";
 import { PackageOpen } from "lucide-react";
 
 interface CategoryBreakdownProps {
@@ -51,7 +52,7 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
     const textColor = isDark ? "#a1a1aa" : "#71717a";
     const splitLineColor = isDark ? "#1f1f23" : "#f4f4f5";
     const names = categoryAgg.map((c) => c.category);
-    const revenues = categoryAgg.map((c) => (c.revenue / 1_000_000).toFixed(2));
+    const revenues = categoryAgg.map((c) => (c.revenue / 10_000_000).toFixed(2)); // in Crores
     const margins = categoryAgg.map((c) => c.marginPct);
 
     return {
@@ -67,15 +68,15 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
           const item = categoryAgg[idx];
           return `
             <div style="font-weight:600; font-family:monospace;">${item.category}</div>
-            <div style="margin-top:4px;">Revenue: <b>$${(item.revenue / 1_000_000).toFixed(2)}M</b></div>
-            <div>Gross Profit: <b>$${(item.profit / 1_000_000).toFixed(2)}M</b></div>
+            <div style="margin-top:4px;">Revenue: <b>${formatINR(item.revenue)}</b></div>
+            <div>Gross Profit: <b>${formatINR(item.profit)}</b></div>
             <div>Profit Margin: <b style="color:#10b981">${item.marginPct}%</b></div>
-            <div style="font-size:11px; color:#a1a1aa;">Units Sold: ${item.units.toLocaleString()}</div>
+            <div style="font-size:11px; color:#a1a1aa;">Units Sold: ${item.units.toLocaleString("en-IN")}</div>
           `;
         },
       },
       legend: {
-        data: ["Revenue ($M)", "Profit Margin %"],
+        data: ["Revenue (₹ Cr)", "Profit Margin %"],
         textStyle: { color: textColor },
         top: 0,
         right: 10,
@@ -83,22 +84,27 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
       grid: {
         left: "3%",
         right: "4%",
-        bottom: "8%",
+        bottom: "12%",
         top: "14%",
         containLabel: true,
       },
       xAxis: {
         type: "category",
         data: names,
-        axisLabel: { color: textColor, fontSize: 11 },
+        axisLabel: { 
+          color: textColor, 
+          fontSize: 10,
+          interval: 0,
+          rotate: names.length > 4 ? 15 : 0
+        },
         axisLine: { lineStyle: { color: isDark ? "#27272a" : "#e4e4e7" } },
       },
       yAxis: [
         {
           type: "value",
-          name: "Revenue ($M)",
+          name: "Revenue (₹ Cr)",
           nameTextStyle: { color: textColor, fontSize: 11 },
-          axisLabel: { color: textColor, formatter: "${value}M", fontSize: 10 },
+          axisLabel: { color: textColor, formatter: "₹{value} Cr", fontSize: 10 },
           splitLine: { lineStyle: { color: splitLineColor } },
         },
         {
@@ -112,7 +118,7 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
       ],
       series: [
         {
-          name: "Revenue ($M)",
+          name: "Revenue (₹ Cr)",
           type: "bar",
           data: revenues,
           barMaxWidth: 36,
@@ -145,10 +151,10 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50">
-            Category Financial Performance & Margins
+            Category Financial Performance & Margins (₹ Crores)
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Cross-category revenue scale versus gross margin profitability.
+            Ethnic Apparel, Electronics, Ayurveda, Home & Sports performance across India.
           </p>
         </div>
         <PackageOpen className="w-5 h-5 text-indigo-500" />
@@ -160,4 +166,3 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
     </div>
   );
 };
-
