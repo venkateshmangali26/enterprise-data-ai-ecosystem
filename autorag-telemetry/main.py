@@ -459,19 +459,19 @@ class PredictiveMaintenanceML:
             kurtosis=round(raw_feats[4], 4)
         )
 
-        # Calibrated risk classification based on continuous score
+        # Calibrated risk classification based on continuous score (in Indian Rupees ₹)
         if raw_score < -0.12:
             risk_level = "CRITICAL"
-            action = "Immediate powertrain shutdown. Bearing spalling or cylinder misfire resonant signature."
-            cost = 15000.0
+            action = "Immediate powertrain shutdown. Bearing spalling or cylinder misfire resonant signature on highway transit."
+            cost = 1500000.0  # ₹15,00,000 (Catastrophic engine overhaul & transit recovery)
         elif raw_score < 0.0:
             risk_level = "ELEVATED"
-            action = "Schedule workshop inspection within 24 operating hours; early bearing race wear detected."
-            cost = 1200.0
+            action = "Schedule workshop inspection at authorized service depot within 24 operating hours; early bearing race wear detected."
+            cost = 85000.0   # ₹85,000 (Subsystem bench repair / sensor replacement)
         else:
             risk_level = "NORMAL"
-            action = "Telemetry signal nominal within calibrated healthy operating envelope."
-            cost = 150.0
+            action = "Telemetry signal nominal within calibrated BS-VI healthy operating envelope."
+            cost = 15000.0   # ₹15,000 (Routine workshop inspection & diagnostic scan)
 
         return FailurePredictionResponse(
             anomaly_detected=is_anomaly,
@@ -494,21 +494,21 @@ ml_service = PredictiveMaintenanceML()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pre-seed verified enterprise telemetry manuals (Complete 4-document benchmark set)
+    # Pre-seed verified enterprise telemetry manuals (ARAI & BS-VI benchmark set)
     vector_store.upsert_document(
         doc_id="DOC-OBDII-884",
-        section="Section 4.2: Powertrain Diagnostic Trouble Codes",
-        content="P0300 indicates random/multiple cylinder misfires. Critical checks: verify fuel rail pressure (spec: 45-55 PSI), test ignition coil primary resistance (spec: 0.5-0.9 ohms), and inspect mass air flow sensor for debris."
+        section="Section 4.2: Bharat Stage VI (BS-VI) Powertrain Diagnostic Trouble Codes",
+        content="P0300 indicates random/multiple cylinder misfires under Indian driving cycles. Critical checks: verify common rail fuel pressure (spec: 45-55 PSI / 1800 bar rail), test ignition coil primary resistance (spec: 0.5-0.9 ohms), and inspect mass air flow sensor for dust contamination prevalent in Indian operating corridors."
     )
     vector_store.upsert_document(
         doc_id="DOC-CAN-BUS-102",
-        section="Section 9.1: CAN Bus Telemetry & Latency Diagnostics",
-        content="Controller Area Network high-speed bus (500 kbps) error frames exceeding 5% threshold indicate bus degradation. Measure split termination resistance across pins 6 (CAN-H) and 14 (CAN-L); nominal reading is 60 ohms (two 120 ohm resistors in parallel)."
+        section="Section 9.1: ARAI-Compliant CAN Bus Telemetry & Latency Diagnostics",
+        content="Controller Area Network high-speed bus (500 kbps) error frames exceeding 5% threshold indicate bus degradation under commercial fleet telematics. Measure split termination resistance across pins 6 (CAN-H) and 14 (CAN-L); nominal reading is 60 ohms (two 120 ohm resistors in parallel)."
     )
     vector_store.upsert_document(
         doc_id="DOC-BAT-401",
-        section="Section 2.4: 48V Mild Hybrid DC/DC Architecture",
-        content="The 48V-to-12V bi-directional buck/boost converter incorporates thermal runaway protection. Thermal throttling engages at 95°C; emergency shutdown occurs at 105°C with DTC B102F stored in the Battery Energy Control Module (BECM)."
+        section="Section 2.4: 48V Mild Hybrid DC/DC Architecture (Tropical Ambient Rating)",
+        content="The 48V-to-12V bi-directional buck/boost converter incorporates thermal runaway protection engineered for peak Indian ambient summer temperatures (up to 48°C). Thermal throttling engages at 95°C; emergency shutdown occurs at 105°C with DTC B102F stored in the Battery Energy Control Module (BECM)."
     )
     vector_store.upsert_document(
         doc_id="DOC-ECU-550",

@@ -89,15 +89,15 @@ def generate_synthetic_telemetry(n_samples: int = 4000, timesteps: int = 300):
 
 def optimize_cost_matrix(y_true: np.ndarray, y_proba: np.ndarray):
     """
-    Evaluates business cost utility across decision probability thresholds.
-    Cost Parameters:
-      - False Negative (Uncaught Failure): $15,000 (catastrophic engine teardown)
-      - False Positive (False Alarm): $150 (30-minute sensor inspection)
-      - True Positive (Prevented Failure): $0 cost ($14,850 net savings)
-      - True Negative (Nominal Health): $0
+    Evaluates business cost utility across decision probability thresholds for Indian fleet telemetry.
+    Cost Parameters (in Indian Rupees ₹):
+      - False Negative (Uncaught Failure on Highway NH-44): ₹15,00,000 (catastrophic engine overhaul & transit delay)
+      - False Positive (False Alarm): ₹15,000 (authorized workshop sensor diagnostic verification)
+      - True Positive (Prevented Failure): ₹0 cost (₹14,85,000 net savings)
+      - True Negative (Nominal Health): ₹0
     """
-    cost_fn = 15000.0
-    cost_fp = 150.0
+    cost_fn = 1500000.0
+    cost_fp = 15000.0
 
     thresholds = np.linspace(0.05, 0.95, 91)
     best_thresh = 0.50
@@ -163,13 +163,13 @@ def train_pipeline():
     print(f"   ROC-AUC Score: {roc_auc:.4f}")
 
     # 6. Optimize Cost Matrix
-    print("\n5. Optimizing Industrial Cost-Utility Matrix ($15,000 FN vs $150 FP)...")
+    print("\n5. Optimizing Industrial Cost-Utility Matrix (₹15,00,000 FN vs ₹15,000 FP)...")
     best_th, opt_cost, def_cost, df_cost_curve = optimize_cost_matrix(y_test, y_pred_proba)
     savings = def_cost - opt_cost
 
-    print(f"   Default Threshold (0.50) Total Cost:  ${def_cost:,.2f}")
-    print(f"   Optimal Threshold ({best_th:.3f}) Total Cost:  ${opt_cost:,.2f}")
-    print(f"   Cost Matrix Optimization Savings:     ${savings:,.2f} per 1,000 test cycles")
+    print(f"   Default Threshold (0.50) Total Cost:  ₹{def_cost:,.2f}")
+    print(f"   Optimal Threshold ({best_th:.3f}) Total Cost:  ₹{opt_cost:,.2f}")
+    print(f"   Cost Matrix Optimization Savings:     ₹{savings:,.2f} per 1,000 test cycles")
 
     y_pred_opt = (y_pred_proba >= best_th).astype(int)
     print("\nClassification Report at Optimal Cost Threshold:")

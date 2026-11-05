@@ -100,7 +100,7 @@ class TestPredictiveMaintenanceML:
         res = ml_engine.predict(sig.tolist())
         assert res.risk_level == "NORMAL"
         assert res.anomaly_detected is False
-        assert res.estimated_intervention_cost == 150.0
+        assert res.estimated_intervention_cost == 15000.0
 
     def test_healthy_grid_generalization_false_positive_rate(self, ml_engine):
         """
@@ -145,7 +145,7 @@ class TestPredictiveMaintenanceML:
         assert res.risk_level == "CRITICAL"
         assert res.anomaly_detected is True
         assert res.features.kurtosis > 4.0
-        assert res.estimated_intervention_cost == 15000.0
+        assert res.estimated_intervention_cost == 1500000.0
 
 
 # =============================================================================
