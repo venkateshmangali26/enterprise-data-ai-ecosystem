@@ -153,33 +153,7 @@ The optimizer identifies the cost-optimal decision threshold, saving over **$\$1
 
 ---
 
-## 🐳 One-Command Docker Deployment (Industry-Grade)
-
-Spin up the entire tri-pillar ecosystem with production healthchecks and multi-stage container builds using a single command:
-
-```bash
-# Launch Pillar 1 (Retail Analytics) and Pillar 2 (AutoRAG Diagnostic Engine)
-docker compose up --build
-```
-
-| Service | Host Port | Technology Stack | Healthcheck |
-| :--- | :--- | :--- | :--- |
-| **Retail Analytics Dashboard** | `http://localhost:3001` | Bun 1.1 + Native SQLite (WAL) + React 18 + ECharts | `GET /api/health` |
-| **AutoRAG Diagnostic Studio** | `http://localhost:8000` | FastAPI + Scikit-Learn + Delimiter Sandboxing | `GET /api/health` |
-| **Predictive Maintenance MLOps** | Batch / Profile | 13-Feature Extraction + GradientBoosting + ONNX Export | Automated run |
-
-### Run End-to-End MLOps Pipeline Container:
-```bash
-# Train GradientBoosting models, evaluate cost-utility matrix, and export ONNX models
-docker compose run --rm mlops-pipeline
-
-# Or spin up all 3 services simultaneously
-docker compose --profile all up --build
-```
-
----
-
-## 🚀 Local Quickstart & Execution Guide
+## 🚀 Quickstart & Execution Guide
 
 ### Prerequisites
 - [Bun](https://bun.sh) (v1.4+)

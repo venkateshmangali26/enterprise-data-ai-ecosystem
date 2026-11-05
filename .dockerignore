@@ -44,3 +44,4 @@ Thumbs.db
 # SQLite WAL and lock files (preserve main .db file)
 *.db-shm
 *.db-wal
+

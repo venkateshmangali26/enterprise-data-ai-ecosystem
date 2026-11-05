@@ -57,3 +57,4 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
 
 # Start Bun server serving both the REST API and React SPA
 CMD ["bun", "run", "backend/src/server.ts"]
+
