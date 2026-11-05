@@ -8,9 +8,10 @@ echo [1] Start Pillar 1: Retail Analytics (Bun + SQLite + React on :3001)
 echo [2] Start Pillar 2: AutoRAG Telemetry Engine (FastAPI on :8000)
 echo [3] Run AutoRAG Pytest Verification Suite (19 tests)
 echo [4] Run Pillar 3: Predictive Maintenance ML Training & Cost Matrix
-echo [5] Exit
+echo [5] Spin up entire Ecosystem with Docker Compose (docker compose up --build)
+echo [6] Exit
 echo.
-set /p choice="Select an option (1-5): "
+set /p choice="Select an option (1-6): "
 
 if "%choice%"=="1" (
     echo Starting Pillar 1 on http://localhost:3001...
@@ -22,7 +23,7 @@ if "%choice%"=="2" (
 )
 if "%choice%"=="3" (
     echo Running Pytest Suite...
-    pytest autorag-telemetry/test_rag_engine.py -v
+    python -m pytest autorag-telemetry/test_rag_engine.py -v
     pause
 )
 if "%choice%"=="4" (
@@ -31,6 +32,11 @@ if "%choice%"=="4" (
     pause
 )
 if "%choice%"=="5" (
+    echo Launching Docker Compose...
+    docker compose up --build
+    pause
+)
+if "%choice%"=="6" (
     exit
 )
 

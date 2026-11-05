@@ -18,5 +18,5 @@ COPY src/ ./src/
 RUN mkdir -p models data
 
 # Execute training pipeline followed by ONNX export
-CMD ["sh", "-c", "python src/train_pipeline.py && python src/export_onnx.py"]
+CMD ["sh", "-c", "python src/train.py && python src/export_onnx.py"]
 

@@ -459,7 +459,12 @@ const server = Bun.serve({
         return jsonResponse(item);
       }
 
-      // 10. Serve Frontend Static Build (Production SPA Fallback)
+      // 10. API 404 Guard (prevents API routes from falling through to HTML SPA fallback)
+      if (url.pathname.startsWith("/api/")) {
+        return jsonResponse({ error: "API Endpoint Not Found", path: url.pathname }, 404);
+      }
+
+      // 11. Serve Frontend Static Build (Production SPA Fallback)
       if (existsSync(DIST_DIR)) {
         const indexHtml = path.join(DIST_DIR, "index.html");
         if (url.pathname !== "/") {

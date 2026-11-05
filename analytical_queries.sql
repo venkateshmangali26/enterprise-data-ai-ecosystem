@@ -197,8 +197,8 @@ ORDER BY primary_rank ASC;
 -- -----------------------------------------------------------------------------
 
 WITH reference_snapshot AS (
-    -- Anchor date: maximum date in fact dataset + 1 day
-    SELECT MAX(order_date) + INTERVAL '1 day' AS snapshot_date
+    -- Anchor date: maximum date in fact dataset + 1 day (SQLite / DuckDB / ANSI compatible)
+    SELECT date(MAX(order_date), '+1 day') AS snapshot_date
     FROM fact_transactions
 ),
 customer_rfm_raw AS (
@@ -209,7 +209,7 @@ customer_rfm_raw AS (
         c.segment                          AS customer_profile,
         c.state,
         -- Recency: Days elapsed between anchor snapshot and customer's latest order
-        DATE_PART('day', (SELECT snapshot_date FROM reference_snapshot) - MAX(f.order_date))::INTEGER AS recency_days,
+        CAST(julianday((SELECT snapshot_date FROM reference_snapshot)) - julianday(MAX(f.order_date)) AS INTEGER) AS recency_days,
         -- Frequency: Total distinct orders placed
         COUNT(DISTINCT f.order_id)         AS frequency,
         -- Monetary: Total lifetime net revenue generated
@@ -273,12 +273,12 @@ customer_segmentation AS (
 SELECT
     rfm_segment,
     COUNT(*)                                                         AS total_customers,
-    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2)               AS customer_share_pct,
+    ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM dim_customers), 2) AS customer_share_pct,
     ROUND(AVG(recency_days), 1)                                      AS avg_recency_days,
     ROUND(AVG(frequency), 2)                                         AS avg_order_count,
     ROUND(AVG(monetary), 2)                                          AS avg_monetary_spend,
     ROUND(SUM(monetary), 2)                                          AS total_segment_revenue,
-    ROUND(100.0 * SUM(monetary) / SUM(SUM(monetary)) OVER (), 2)     AS revenue_contribution_pct
+    ROUND(100.0 * SUM(monetary) / (SELECT SUM(net_revenue) FROM fact_transactions), 2) AS revenue_contribution_pct
 FROM customer_segmentation
 GROUP BY rfm_segment
 ORDER BY total_segment_revenue DESC;
