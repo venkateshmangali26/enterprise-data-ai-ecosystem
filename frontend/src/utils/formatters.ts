@@ -29,3 +29,4 @@ export function formatINRAmount(val: number | undefined | null): string {
   if (val === undefined || val === null || isNaN(val)) return "₹0";
   return `₹${Math.round(val).toLocaleString("en-IN")}`;
 }
+

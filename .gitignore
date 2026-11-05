@@ -66,4 +66,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 bun.lockb
+*.zip
+*.joblib
+*.onnx
 
