@@ -153,7 +153,45 @@ The optimizer identifies the cost-optimal decision threshold, saving over **$\$1
 
 ---
 
-## 🚀 Quickstart & Execution Guide
+## ⚡ One-Click Vercel Deployment
+
+Deploy the executive React 18 + Vite analytics dashboard directly to **[Vercel](https://vercel.com)**:
+
+1. Log in to [vercel.com](https://vercel.com) and click **"Add New Project"** $\rightarrow$ **"Import"** your GitHub repository (`venkateshmangali26/enterprise-data-ai-ecosystem`).
+2. Vercel automatically detects [`vercel.json`](vercel.json) with the Vite framework preset.
+3. *(Optional)* Set the Environment Variable `VITE_API_URL` to your production backend URL (e.g., on Railway, Fly.io, or Render).
+4. Click **"Deploy"**. The app deploys in under 45 seconds!
+   - Built-in zero-config fallback guarantees that all executive KPI cards, ECharts revenue curves, store rankings, and RFM customer segmentation render interactively immediately, even before an external backend is attached.
+
+---
+
+## 🐳 One-Command Docker Deployment (Industry-Grade)
+
+Spin up the entire tri-pillar ecosystem with production healthchecks and multi-stage container builds using a single command:
+
+```bash
+# Launch Pillar 1 (Retail Analytics) and Pillar 2 (AutoRAG Diagnostic Engine)
+docker compose up --build
+```
+
+| Service | Host Port | Technology Stack | Healthcheck |
+| :--- | :--- | :--- | :--- |
+| **Retail Analytics Dashboard** | `http://localhost:3001` | Bun 1.1 + Native SQLite (WAL) + React 18 + ECharts | `GET /api/health` |
+| **AutoRAG Diagnostic Studio** | `http://localhost:8000` | FastAPI + Scikit-Learn + Delimiter Sandboxing | `GET /api/health` |
+| **Predictive Maintenance MLOps** | Batch / Profile | 13-Feature Extraction + GradientBoosting + ONNX Export | Automated run |
+
+### Run End-to-End MLOps Pipeline Container:
+```bash
+# Train GradientBoosting models, evaluate cost-utility matrix, and export ONNX models
+docker compose run --rm mlops-pipeline
+
+# Or spin up all 3 services simultaneously
+docker compose --profile all up --build
+```
+
+---
+
+## 🚀 Local Quickstart & Execution Guide
 
 ### Prerequisites
 - [Bun](https://bun.sh) (v1.4+)

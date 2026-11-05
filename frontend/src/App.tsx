@@ -16,6 +16,16 @@ import {
   PaginatedTransactions, 
   TransactionItem 
 } from "./types";
+import { 
+  FALLBACK_KPIS, 
+  FALLBACK_TRENDS, 
+  FALLBACK_STORES, 
+  FALLBACK_SEGMENTS, 
+  FALLBACK_CATEGORIES, 
+  FALLBACK_TRANSACTIONS 
+} from "./data/fallbackData";
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export function App() {
   const [isDark, setIsDark] = useState<boolean>(true);
@@ -50,7 +60,7 @@ export function App() {
 
   const toggleTheme = () => setIsDark((prev) => !prev);
 
-  // Fetch overview & analytics data
+  // Fetch overview & analytics data (with automatic offline / Vercel fallback)
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -58,26 +68,55 @@ export function App() {
       const qCategory = selectedCategory !== "All" ? `&category=${encodeURIComponent(selectedCategory)}` : "";
 
       const [kpiRes, revRes, storeRes, segRes, catRes] = await Promise.all([
-        fetch(`/api/overview?_t=${Date.now()}${qRegion}${qCategory}`),
-        fetch(`/api/revenue-trend?_t=${Date.now()}${qRegion}`),
-        fetch(`/api/stores/top?limit=10${qRegion}`),
-        fetch(`/api/customer-segments`),
-        fetch(`/api/categories`),
+        fetch(`${API_BASE}/api/overview?_t=${Date.now()}${qRegion}${qCategory}`).catch(() => null),
+        fetch(`${API_BASE}/api/revenue-trend?_t=${Date.now()}${qRegion}`).catch(() => null),
+        fetch(`${API_BASE}/api/stores/top?limit=10${qRegion}`).catch(() => null),
+        fetch(`${API_BASE}/api/customer-segments`).catch(() => null),
+        fetch(`${API_BASE}/api/categories`).catch(() => null),
       ]);
 
-      if (kpiRes.ok) setKpis(await kpiRes.json());
-      if (revRes.ok) setRevenueTrends(await revRes.json());
-      if (storeRes.ok) setTopStores(await storeRes.json());
-      if (segRes.ok) setCustomerSegments(await segRes.json());
-      if (catRes.ok) setCategories(await catRes.json());
+      if (kpiRes && kpiRes.ok) {
+        setKpis(await kpiRes.json());
+      } else {
+        setKpis(FALLBACK_KPIS);
+      }
+
+      if (revRes && revRes.ok) {
+        setRevenueTrends(await revRes.json());
+      } else {
+        setRevenueTrends(selectedRegion === "All" ? FALLBACK_TRENDS : FALLBACK_TRENDS.filter(t => t.region === selectedRegion));
+      }
+
+      if (storeRes && storeRes.ok) {
+        setTopStores(await storeRes.json());
+      } else {
+        setTopStores(selectedRegion === "All" ? FALLBACK_STORES : FALLBACK_STORES.filter(s => s.region === selectedRegion));
+      }
+
+      if (segRes && segRes.ok) {
+        setCustomerSegments(await segRes.json());
+      } else {
+        setCustomerSegments(FALLBACK_SEGMENTS);
+      }
+
+      if (catRes && catRes.ok) {
+        setCategories(await catRes.json());
+      } else {
+        setCategories(selectedCategory === "All" ? FALLBACK_CATEGORIES : FALLBACK_CATEGORIES.filter(c => c.category === selectedCategory));
+      }
     } catch (err) {
-      console.error("Failed to fetch analytical datasets:", err);
+      console.warn("API request failed, falling back to static offline metrics for Vercel:", err);
+      setKpis(FALLBACK_KPIS);
+      setRevenueTrends(FALLBACK_TRENDS);
+      setTopStores(FALLBACK_STORES);
+      setCustomerSegments(FALLBACK_SEGMENTS);
+      setCategories(FALLBACK_CATEGORIES);
     } finally {
       setIsLoading(false);
     }
   }, [selectedRegion, selectedCategory]);
 
-  // Fetch paginated transactions
+  // Fetch paginated transactions (with interactive offline / Vercel fallback)
   const fetchTransactions = useCallback(async () => {
     try {
       const params = new URLSearchParams({
@@ -89,12 +128,32 @@ export function App() {
         sortBy,
         sortDir,
       });
-      const res = await fetch(`/api/transactions?${params.toString()}`);
-      if (res.ok) {
+      const res = await fetch(`${API_BASE}/api/transactions?${params.toString()}`).catch(() => null);
+      if (res && res.ok) {
         setTransactions(await res.json());
+      } else {
+        let filtered = [...FALLBACK_TRANSACTIONS.items];
+        if (selectedRegion !== "All") filtered = filtered.filter(t => t.region === selectedRegion);
+        if (selectedCategory !== "All") filtered = filtered.filter(t => t.category === selectedCategory);
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          filtered = filtered.filter(t => 
+            t.order_id.toLowerCase().includes(q) || 
+            t.customer_name.toLowerCase().includes(q) || 
+            t.product_name.toLowerCase().includes(q)
+          );
+        }
+        setTransactions({
+          page,
+          limit: 15,
+          total: filtered.length,
+          totalPages: Math.max(1, Math.ceil(filtered.length / 15)),
+          items: filtered.slice((page - 1) * 15, page * 15)
+        });
       }
     } catch (err) {
-      console.error("Failed to fetch transactions:", err);
+      console.warn("Transactions API failed, using fallback data:", err);
+      setTransactions(FALLBACK_TRANSACTIONS);
     }
   }, [page, searchQuery, selectedRegion, selectedCategory, sortBy, sortDir]);
 
