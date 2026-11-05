@@ -1,0 +1,80 @@
+version: "3.9"
+
+services:
+  # ============================================================================
+  # Pillar 1: Enterprise Retail Analytics Platform
+  # Bun High-Performance SQLite REST API + React 18 Executive Dashboard
+  # ============================================================================
+  retail-analytics:
+    container_name: retail-analytics-dashboard
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - DIST_DIR=/app/frontend/dist
+      - DATABASE_PATH=/app/backend/retail_analytics.db
+    volumes:
+      # Mount host SQLite database for data persistence
+      - ./backend/retail_analytics.db:/app/backend/retail_analytics.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - enterprise-network
+
+  # ============================================================================
+  # Pillar 2: Enterprise AutoRAG Diagnostic Engine
+  # FastAPI Vector Semantic Search + XML Sandboxed Diagnostic Studio
+  # ============================================================================
+  autorag-telemetry:
+    container_name: autorag-diagnostic-engine
+    build:
+      context: ./autorag-telemetry
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - AUTORAG_FAST_FALLBACK=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - enterprise-network
+
+  # ============================================================================
+  # Pillar 3: Predictive Maintenance MLOps Pipeline (Batch & Export Job)
+  # Run on demand: docker compose --profile all up OR docker compose run mlops-pipeline
+  # ============================================================================
+  mlops-pipeline:
+    container_name: predictive-maintenance-mlops
+    build:
+      context: ./predictive-maintenance-ml
+      dockerfile: Dockerfile
+    profiles:
+      - mlops
+      - all
+    volumes:
+      # Sync trained .joblib & exported .onnx models back to host disk
+      - ./predictive-maintenance-ml/models:/app/models
+    networks:
+      - enterprise-network
+
+networks:
+  enterprise-network:
+    driver: bridge

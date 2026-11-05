@@ -271,7 +271,7 @@ class PromptDefenseEngine:
     @classmethod
     def sanitize(cls, text: str) -> str:
         """Escapes angle brackets for XML tags in untrusted user input to prevent breakout."""
-        return re.sub(r"<\s*/?\s*([a-zA-Z_:][a-zA-Z0-9._:-]*)\b[^>]*>", r"[\1]", text).strip()
+        return re.sub(r"<\s*(/?)\s*([a-zA-Z_:][a-zA-Z0-9._:-]*)\b[^>]*>", r"[\1\2]", text).strip()
 
     @classmethod
     def inspect(cls, user_query: str) -> Tuple[bool, str]:
@@ -709,5 +709,7 @@ async def predict_failure(payload: TelemetrySensorPayload):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run(app, host=host, port=port)
 

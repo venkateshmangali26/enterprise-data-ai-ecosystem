@@ -1,0 +1,46 @@
+# Git & Metadata
+.git/
+.github/
+.gitignore
+*.md
+!README.md
+
+# Package manager & caches
+node_modules/
+*/node_modules/
+bun.lock
+bun.lockb
+.npm/
+.yarn/
+
+# Frontend build output (rebuilt inside Docker stage 1)
+frontend/dist/
+
+# Python caches and environments
+.venv/
+*/.venv/
+env/
+venv/
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+*/.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary and local artifacts
+.tmp/
+*.zip
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# SQLite WAL and lock files (preserve main .db file)
+*.db-shm
+*.db-wal

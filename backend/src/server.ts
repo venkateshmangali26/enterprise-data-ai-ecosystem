@@ -1,9 +1,12 @@
-import { db } from "./db";
+import { db, initDatabaseSchema } from "./db";
 import path from "path";
 import { existsSync, statSync } from "fs";
 
-const PORT = 3001;
-const DIST_DIR = path.resolve(__dirname, "../../frontend/dist");
+const PORT = Number(process.env.PORT) || 3001;
+const HOST = process.env.HOST || "0.0.0.0";
+const DIST_DIR = process.env.DIST_DIR || path.resolve(__dirname, "../../frontend/dist");
+
+initDatabaseSchema();
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -18,7 +21,7 @@ function jsonResponse(data: unknown, status = 200) {
 }
 
 const server = Bun.serve({
-  hostname: "127.0.0.1",
+  hostname: HOST,
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
