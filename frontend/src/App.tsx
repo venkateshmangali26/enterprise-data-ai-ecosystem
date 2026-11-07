@@ -26,8 +26,29 @@ import {
 } from "./data/fallbackData";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
-const AUTH_HEADERS: HeadersInit = {
-  Authorization: "Bearer retail-analytics-secure-token-2025",
+
+// Dynamic token resolution from session storage, URL param, or build-time env (no secrets hardcoded in frontend bundle)
+const getAuthHeaders = (): HeadersInit => {
+  if (typeof window !== "undefined") {
+    const fromStorage =
+      window.sessionStorage.getItem("retail_api_token") ||
+      window.localStorage.getItem("retail_api_token");
+    if (fromStorage) return { Authorization: `Bearer ${fromStorage}` };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromUrl = urlParams.get("token");
+    if (fromUrl) {
+      window.sessionStorage.setItem("retail_api_token", fromUrl);
+      return { Authorization: `Bearer ${fromUrl}` };
+    }
+  }
+
+  const envToken = import.meta.env.VITE_API_TOKEN;
+  if (envToken) {
+    return { Authorization: `Bearer ${envToken}` };
+  }
+
+  return {};
 };
 
 export function App() {
@@ -70,12 +91,13 @@ export function App() {
       const qRegion = selectedRegion !== "All" ? `&region=${encodeURIComponent(selectedRegion)}` : "";
       const qCategory = selectedCategory !== "All" ? `&category=${encodeURIComponent(selectedCategory)}` : "";
 
+      const authHeaders = getAuthHeaders();
       const [kpiRes, revRes, storeRes, segRes, catRes] = await Promise.all([
-        fetch(`${API_BASE}/api/overview?_t=${Date.now()}${qRegion}${qCategory}`, { headers: AUTH_HEADERS }).catch(() => null),
-        fetch(`${API_BASE}/api/revenue-trend?_t=${Date.now()}${qRegion}`, { headers: AUTH_HEADERS }).catch(() => null),
-        fetch(`${API_BASE}/api/stores/top?limit=10${qRegion}`, { headers: AUTH_HEADERS }).catch(() => null),
-        fetch(`${API_BASE}/api/customer-segments`, { headers: AUTH_HEADERS }).catch(() => null),
-        fetch(`${API_BASE}/api/categories`, { headers: AUTH_HEADERS }).catch(() => null),
+        fetch(`${API_BASE}/api/overview?_t=${Date.now()}${qRegion}${qCategory}`, { headers: authHeaders }).catch(() => null),
+        fetch(`${API_BASE}/api/revenue-trend?_t=${Date.now()}${qRegion}`, { headers: authHeaders }).catch(() => null),
+        fetch(`${API_BASE}/api/stores/top?limit=10${qRegion}`, { headers: authHeaders }).catch(() => null),
+        fetch(`${API_BASE}/api/customer-segments`, { headers: authHeaders }).catch(() => null),
+        fetch(`${API_BASE}/api/categories`, { headers: authHeaders }).catch(() => null),
       ]);
 
       if (kpiRes && kpiRes.ok) {
@@ -132,7 +154,7 @@ export function App() {
         sortDir,
       });
       const res = await fetch(`${API_BASE}/api/transactions?${params.toString()}`, {
-        headers: AUTH_HEADERS,
+        headers: getAuthHeaders(),
       }).catch(() => null);
       if (res && res.ok) {
         setTransactions(await res.json());

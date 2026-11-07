@@ -1,6 +1,7 @@
 import { db, initDatabaseSchema } from "./db";
 import path from "path";
 import { existsSync, statSync } from "fs";
+import { timingSafeEqual } from "node:crypto";
 
 // Initialize database schema on module load
 initDatabaseSchema();
@@ -13,37 +14,52 @@ const ALLOWED_ORIGINS = (
   "http://localhost:5173,http://localhost:3000,http://localhost:3001,http://127.0.0.1:5173,http://127.0.0.1:3001"
 )
   .split(",")
-  .map((s) => s.trim());
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 // Configurable Authentication Middleware
-// When REQUIRE_AUTH is true, requests to protected endpoints require Authorization: Bearer <API_TOKEN>
 export const REQUIRE_AUTH = process.env.REQUIRE_AUTH !== "false";
 export const API_TOKEN =
-  process.env.API_TOKEN || process.env.API_KEY || "retail-analytics-secure-token-2025";
+  process.env.API_TOKEN || process.env.API_KEY || "";
+
+if (REQUIRE_AUTH && !API_TOKEN) {
+  throw new Error(
+    "API_TOKEN or API_KEY must be configured when authentication is enabled."
+  );
+}
 
 export function checkAuth(req: Request): boolean {
-  if (!REQUIRE_AUTH) {
-    return true;
-  }
+  if (!REQUIRE_AUTH) return true;
+  if (!API_TOKEN) return false;
+
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return false;
-  const parts = authHeader.split(" ");
-  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") return false;
-  return parts[1] === API_TOKEN;
+
+  const match = authHeader.match(/^Bearer\s+(\S+)$/i);
+  if (!match) return false;
+
+  const supplied = Buffer.from(match[1], "utf8");
+  const expected = Buffer.from(API_TOKEN, "utf8");
+
+  if (supplied.length !== expected.length) return false;
+
+  return timingSafeEqual(supplied, expected);
 }
 
 export function getCorsHeaders(req?: Request): Record<string, string> {
-  const origin = req?.headers.get("origin");
-  let allowed = ALLOWED_ORIGINS[0];
-  if (origin && (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes("*"))) {
-    allowed = origin;
-  }
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Vary": "Origin",
   };
+
+  const origin = req?.headers.get("Origin");
+
+  if (origin && (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes("*"))) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+
+  return headers;
 }
 
 export function jsonResponse(data: unknown, status = 200, req?: Request): Response {
@@ -100,22 +116,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   try {
-    // Endpoint 1: Health check
+    // Endpoint 1: Health check (Public liveness probe without leaking operational stats)
     if (url.pathname === "/api/health") {
-      const stats = db.query(`
-        SELECT 
-          (SELECT COUNT(*) FROM fact_transactions) as transactions,
-          (SELECT COUNT(*) FROM dim_stores) as stores,
-          (SELECT COUNT(*) FROM dim_products) as products,
-          (SELECT COUNT(*) FROM dim_customers) as customers
-      `).get() as Record<string, number>;
-
       return jsonResponse(
         {
           status: "healthy",
-          server: "Bun + Native SQLite",
-          counts: stats,
-          auth_enabled: REQUIRE_AUTH,
           timestamp: new Date().toISOString(),
         },
         200,
@@ -606,7 +611,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       );
     }
 
-    // Endpoint 9: Single Transaction Details for Drawer (Explicit projection & PII masking)
+    // Endpoint 9: Single Transaction Details for Drawer (Unambiguous transaction_id lookup & PII masking)
     if (url.pathname.startsWith("/api/transactions/")) {
       const id = url.pathname.split("/").pop();
       const query = `
@@ -640,10 +645,10 @@ export async function handleRequest(req: Request): Promise<Response> {
         JOIN dim_stores s ON f.store_id = s.store_id
         JOIN dim_products p ON f.product_id = p.product_id
         JOIN dim_customers c ON f.customer_id = c.customer_id
-        WHERE f.transaction_id = ? OR f.order_id = ?
+        WHERE f.transaction_id = ?
         LIMIT 1
       `;
-      const item = db.prepare(query).get(id, id);
+      const item = db.prepare(query).get(id);
       if (!item) {
         return jsonResponse({ error: "Transaction not found" }, 404, req);
       }
@@ -655,18 +660,34 @@ export async function handleRequest(req: Request): Promise<Response> {
       return jsonError("API Endpoint Not Found", 404, url.pathname, req);
     }
 
-    // Endpoint 11: Serve Frontend Static Build (Production SPA Fallback)
+    // Endpoint 11: Serve Frontend Static Build (Production SPA with Path Traversal Guard)
     if (existsSync(DIST_DIR)) {
       const indexHtml = path.join(DIST_DIR, "index.html");
+
       if (url.pathname !== "/") {
-        const requestedFile = path.join(DIST_DIR, url.pathname);
-        if (existsSync(requestedFile) && statSync(requestedFile).isFile()) {
+        const decodedPath = decodeURIComponent(url.pathname);
+        const requestedFile = path.resolve(DIST_DIR, `.${decodedPath}`);
+        const relativePath = path.relative(DIST_DIR, requestedFile);
+
+        const isInsideDist =
+          relativePath !== ".." &&
+          !relativePath.startsWith(`..${path.sep}`) &&
+          !path.isAbsolute(relativePath);
+
+        if (
+          isInsideDist &&
+          existsSync(requestedFile) &&
+          statSync(requestedFile).isFile()
+        ) {
           return new Response(Bun.file(requestedFile));
         }
       }
+
       if (existsSync(indexHtml)) {
         return new Response(Bun.file(indexHtml), {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
         });
       }
     }
@@ -678,4 +699,3 @@ export async function handleRequest(req: Request): Promise<Response> {
     return jsonError(msg, 500, url.pathname, req);
   }
 }
-

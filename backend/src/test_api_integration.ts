@@ -58,15 +58,15 @@ async function runIntegrationTests() {
 
   try {
     // -------------------------------------------------------------
-    // Group 1: Server Core & System Health (Public probe)
+    // Group 1: Server Core & System Health (Public probe without leaking internals)
     // -------------------------------------------------------------
     const { res: healthRes, json: health } = await testApi("/api/health", {}, false);
     assert(healthRes.status === 200, "1. GET /api/health returns HTTP 200 without authentication");
     assert((health as any)?.status === "healthy", "1. Health check returns healthy status");
-    assert(typeof (health as any)?.counts?.transactions === "number" && (health as any).counts.transactions > 0, "1. Database contains transactional records");
+    assert((health as any)?.timestamp !== undefined, "1. Health check returns timestamp");
 
     // -------------------------------------------------------------
-    // Group 2: Security & Authentication Enforcement
+    // Group 2: Security & Authentication Enforcement (Constant-time token validation)
     // -------------------------------------------------------------
     // Missing bearer token returns 401
     const { res: missingAuthRes } = await testApi("/api/overview", {}, false);
@@ -75,7 +75,7 @@ async function runIntegrationTests() {
     // Invalid bearer token returns 401
     const { res: invalidAuthRes } = await testApi("/api/overview", {
       headers: {
-        Authorization: "Bearer invalid-test-token",
+        Authorization: "Bearer invalid-test-token-12345",
       },
     });
     assert(invalidAuthRes.status === 401, "2. Security: Invalid bearer token returns HTTP 401");
@@ -196,7 +196,7 @@ async function runIntegrationTests() {
     assert(unknownTxRes.status === 404, "14. Unknown transaction ID returns HTTP 404");
 
     // -------------------------------------------------------------
-    // Group 11: Security, CORS, Preflight, & HTTP Method Guard
+    // Group 11: Security, CORS Origin Validation, Preflight, & HTTP Method Guard
     // -------------------------------------------------------------
     // Authorized origin CORS reflection (literal string without markdown link syntax)
     const allowedOrigin = "http://localhost:5173";
@@ -210,10 +210,22 @@ async function runIntegrationTests() {
       "15. CORS header reflects authorized origin"
     );
 
+    // Unauthorized origin does NOT receive Access-Control-Allow-Origin header
+    const unauthorizedOrigin = "http://unauthorized-malicious-site.com";
+    const { res: unauthCorsRes } = await testApi("/api/overview", {
+      headers: {
+        Origin: unauthorizedOrigin,
+      },
+    });
+    assert(
+      unauthCorsRes.headers.get("Access-Control-Allow-Origin") === null,
+      "15. Unauthorized CORS origin receives no Access-Control-Allow-Origin header"
+    );
+
     // OPTIONS preflight check
     const { res: preflightRes } = await testApi("/api/overview", { method: "OPTIONS" });
     assert(preflightRes.status === 204, "16. OPTIONS preflight request returns HTTP 204 No Content");
-    assert(preflightRes.headers.get("Access-Control-Allow-Methods")?.includes("GET") === true, "16. OPTIONS preflight includes Allowed Methods header");
+    assert(preflightRes.headers.get("Access-Control-Allow-Methods") === "GET, OPTIONS", "16. OPTIONS preflight matches allowed methods GET, OPTIONS");
 
     // Method Guard: Reject POST on read endpoint
     const { res: methodRes, json: methodJson } = await testApi("/api/overview", { method: "POST" });
