@@ -90,7 +90,6 @@ CREATE TABLE dim_calendar (
 );
 
 -- Indexing for date joins and time-series rollups
-CREATE INDEX idx_calendar_date ON dim_calendar(date);
 CREATE INDEX idx_calendar_year_month ON dim_calendar(year, month);
 CREATE INDEX idx_calendar_quarter ON dim_calendar(year, quarter);
 

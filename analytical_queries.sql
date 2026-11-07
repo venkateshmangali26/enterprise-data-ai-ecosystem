@@ -274,12 +274,10 @@ customer_segmentation AS (
         CASE
             WHEN r_score >= 4 AND f_score >= 4 AND m_score >= 4 THEN 'Champions'
             WHEN r_score >= 3 AND f_score >= 3 AND m_score >= 3 THEN 'Loyal Customers'
-            WHEN r_score >= 4 AND f_score = 1                   THEN 'Recent New Customers'
-            WHEN r_score >= 4 AND f_score >= 1 AND f_score <= 3 THEN 'Potential Loyalists'
-            WHEN r_score >= 3 AND f_score <= 2                  THEN 'Promising Customers'
+            WHEN r_score >= 4 AND f_score = 1                   THEN 'Recent Customers'
+            WHEN r_score >= 4 AND f_score <= 3                  THEN 'Potential Loyalists'
             WHEN r_score = 1 AND f_score >= 4                   THEN 'Cannot Lose Them'
-            WHEN r_score <= 2 AND f_score >= 3 AND m_score >= 3 THEN 'At Risk (High Value)'
-            WHEN r_score <= 2 AND f_score <= 2 AND m_score >= 3 THEN 'About to Sleep'
+            WHEN r_score <= 2 AND f_score >= 3 AND m_score >= 3 THEN 'At Risk'
             WHEN r_score <= 2 AND f_score <= 2                  THEN 'Hibernating / Lost'
             ELSE 'Needs Attention'
         END AS rfm_segment

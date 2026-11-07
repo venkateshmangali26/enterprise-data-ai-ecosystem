@@ -154,7 +154,9 @@ class ResilientMaintenanceInferenceEngine:
     def _predict_sklearn(self, arr: np.ndarray) -> float:
         if self.sklearn_pipeline is None:
             raise RuntimeError("Both ONNX and Scikit-Learn inference engines are unavailable.")
-        probs = self.sklearn_pipeline.predict_proba(arr)
+        import pandas as pd
+        df = pd.DataFrame(arr, columns=self.FEATURE_KEYS)
+        probs = self.sklearn_pipeline.predict_proba(df)
         return float(probs[0, 1])
 
 

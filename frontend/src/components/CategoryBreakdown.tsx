@@ -44,7 +44,7 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
 
     return Array.from(map.values()).map((c) => ({
       ...c,
-      marginPct: Math.round((c.profit / c.revenue) * 1000) / 10,
+      marginPct: c.revenue > 0 ? Math.round((c.profit / c.revenue) * 1000) / 10 : 0.0,
     })).sort((a, b) => b.revenue - a.revenue);
   }, [categories]);
 

@@ -75,7 +75,7 @@ export const InvestigationDrawer: React.FC<InvestigationDrawerProps> = ({
               <div className="font-semibold text-zinc-900 dark:text-zinc-100">{formatINRCurrency(transaction.unit_cost)}</div>
             </div>
             <div>
-              <div className="text-zinc-400">Festive Discount</div>
+              <div className="text-zinc-400">Discount</div>
               <div className="font-semibold text-amber-600 dark:text-amber-400">{(transaction.discount_pct * 100).toFixed(0)}%</div>
             </div>
             <div>

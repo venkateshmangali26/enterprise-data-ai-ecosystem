@@ -86,7 +86,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
               ${item.monthName} ${selectedYear} ${isFestivePeak ? "🪔 (Festive Diwali Peak)" : ""}
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px;">
-              <span style="color:#f97316">● Monthly GMV:</span>
+              <span style="color:#f97316">● Monthly Net Revenue:</span>
               <span style="font-weight:bold">₹${(item.revenue / 10_000_000).toFixed(2)} Cr</span>
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px;">

@@ -316,6 +316,16 @@ class DenseVectorStore:
 # 3. Delimiter Injection Defense & Prompt Sandboxing
 # =============================================================================
 
+def safe_xml_text(value: str) -> str:
+    """Safely escapes XML delimiters and special characters to prevent prompt injection and tag breakout."""
+    if value is None:
+        return ""
+    return escape(str(value), {
+        '"': "&quot;",
+        "'": "&apos;"
+    })
+
+
 class PromptDefenseEngine:
     """
     Guards RAG pipeline against delimiter escapes, role hijacking, and instruction overrides.
@@ -355,8 +365,9 @@ class PromptDefenseEngine:
 
     @classmethod
     def sanitize(cls, text: str) -> str:
-        """Escapes angle brackets for XML tags in untrusted user input to prevent breakout."""
-        return re.sub(r"<\s*(/?)\s*([a-zA-Z_:][a-zA-Z0-9._:-]*)\b[^>]*>", r"[\1\2]", text).strip()
+        """Escapes angle brackets and XML entities in untrusted user input to prevent breakout."""
+        tag_neutralized = re.sub(r"<\s*(/?)\s*([a-zA-Z_:][a-zA-Z0-9._:-]*)\b[^>]*>", r"[\1\2]", text).strip()
+        return safe_xml_text(tag_neutralized)
 
     @classmethod
     def inspect(cls, user_query: str) -> Tuple[bool, str]:
@@ -364,16 +375,6 @@ class PromptDefenseEngine:
             if pattern.search(user_query):
                 return True, "Security policy violation: Delimiter tampering or adversarial prompt injection detected."
         return False, ""
-
-
-def safe_xml_text(value: str) -> str:
-    """Safely escapes XML delimiters and special characters to prevent prompt injection and tag breakout."""
-    if value is None:
-        return ""
-    return escape(str(value), {
-        '"': "&quot;",
-        "'": "&apos;"
-    })
 
 
 class ASTSecurityValidator:

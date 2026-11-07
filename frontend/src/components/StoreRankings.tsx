@@ -58,7 +58,7 @@ export const StoreRankings: React.FC<StoreRankingsProps> = ({
                 <th className="pb-2.5 font-semibold">Format</th>
                 <th className="pb-2.5 font-semibold text-right">Profit Margin</th>
                 <th className="pb-2.5 font-semibold text-right">Units Sold</th>
-                <th className="pb-2.5 font-semibold text-right">Net Revenue (GMV)</th>
+                <th className="pb-2.5 font-semibold text-right">Net Revenue</th>
                 <th className="pb-2.5 font-semibold text-right">Sales / SqFt</th>
               </tr>
             </thead>
