@@ -23,8 +23,8 @@ db.exec("PRAGMA busy_timeout = 5000;"); // Wait up to 5s before throwing SQLITE_
 db.exec("PRAGMA temp_store = MEMORY;");
 db.exec("PRAGMA cache_size = -64000;"); // 64MB cache
 
-  export function initDatabaseSchema(): void {
-    db.exec(`
+export function initDatabaseSchema(): void {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS dim_stores (
       store_id        TEXT PRIMARY KEY,
       store_name      TEXT NOT NULL,
@@ -117,4 +117,16 @@ db.exec("PRAGMA cache_size = -64000;"); // 64MB cache
     CREATE INDEX IF NOT EXISTS idx_fact_store_date_revenue ON fact_transactions(store_id, order_date, net_revenue);
     CREATE INDEX IF NOT EXISTS idx_fact_cust_date_revenue ON fact_transactions(customer_id, order_date, net_revenue);
   `);
+}
+
+// Backward and forward compatibility aliases
+export const initSchema = initDatabaseSchema;
+
+export function isDbSeeded(): boolean {
+  try {
+    const row = db.query("SELECT COUNT(*) as count FROM fact_transactions").get() as { count: number };
+    return Boolean(row && row.count > 0);
+  } catch {
+    return false;
   }
+}
