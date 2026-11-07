@@ -148,7 +148,9 @@ In Indian commercial fleet maintenance (Tata Motors, Ashok Leyland, Mahindra Tru
 
 By sweeping classification thresholds $\tau \in [0.05, 0.95]$ against the business loss function:
 
+$$
 \text{Loss} = (\text{FN} \times ₹15,00,000) + (\text{FP} \times ₹15,000)
+$$
 
 The optimizer identifies the cost-optimal decision threshold ($\tau^* \approx 0.08$), saving over **₹1,33,65,000 (₹1.33+ Crores)** per 1,000 fleet operational cycles compared to uncalibrated 0.50 thresholds.
 

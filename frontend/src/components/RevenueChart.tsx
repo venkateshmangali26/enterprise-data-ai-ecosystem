@@ -37,9 +37,9 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
         ytd: 0,
         orders: 0,
       };
-      existing.revenue += row.monthly_revenue;
+      existing.revenue += row.monthly_revenue || 0;
       existing.prevRevenue += row.prev_month_revenue || 0;
-      existing.ytd += row.running_ytd_revenue;
+      existing.ytd += row.running_ytd_revenue || 0;
       existing.orders += row.order_count;
       map.set(row.month, existing);
     });

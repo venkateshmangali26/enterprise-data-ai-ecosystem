@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import path from "path";
 
-const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, "../retail_analytics.db");
+const dbPath = process.env.DATABASE_PATH || process.env.DB_PATH || path.resolve(__dirname, "../retail_analytics.db");
 export const db = new Database(dbPath, { create: true });
 
 // Enable Write-Ahead Logging (WAL) and memory optimizations for high throughput

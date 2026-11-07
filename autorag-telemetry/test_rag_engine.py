@@ -86,7 +86,8 @@ class TestPromptSecurity:
 class TestPredictiveMaintenanceML:
 
     @pytest.fixture(scope="class")
-    def ml_engine(self):
+    @classmethod
+    def ml_engine(cls):
         return PredictiveMaintenanceML()
 
     def test_normal_baseline_signal_passes(self, ml_engine):
@@ -255,7 +256,8 @@ class TestGroundedSynthesisFallback:
 class TestFastAPIIntegration:
 
     @pytest.fixture(scope="class")
-    def client(self):
+    @classmethod
+    def client(cls):
         with TestClient(app) as c:
             yield c
 

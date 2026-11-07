@@ -33,9 +33,9 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
         units: 0,
         subcategories: [],
       };
-      existing.revenue += c.total_revenue;
-      existing.profit += c.gross_profit;
-      existing.units += c.total_units_sold;
+      existing.revenue += c.total_revenue || 0;
+      existing.profit += c.gross_profit || 0;
+      existing.units += c.total_units_sold ?? c.units_sold ?? 0;
       if (!existing.subcategories.includes(c.sub_category)) {
         existing.subcategories.push(c.sub_category);
       }

@@ -21,9 +21,10 @@ export interface RevenueTrendRow {
   month_name: string;
   period: string;
   monthly_revenue: number;
-  prev_month_revenue: number;
-  mom_growth_pct: number | null;
-  running_ytd_revenue: number;
+  monthly_profit?: number;
+  prev_month_revenue?: number;
+  mom_growth_pct?: number | null;
+  running_ytd_revenue?: number;
   units_sold: number;
   order_count: number;
 }
@@ -63,11 +64,14 @@ export interface CategoryFinancialRow {
   category: string;
   sub_category: string;
   total_revenue: number;
-  total_cost: number;
+  total_cost?: number;
   gross_profit: number;
   profit_margin_pct: number;
-  total_units_sold: number;
-  total_orders: number;
+  total_units_sold?: number;
+  units_sold?: number;
+  total_orders?: number;
+  order_count?: number;
+  avg_discount_pct?: number;
 }
 
 export interface TransactionItem {
@@ -76,6 +80,7 @@ export interface TransactionItem {
   order_date: string;
   store_id: string;
   store_name: string;
+  city?: string;
   region: string;
   product_id: string;
   product_name: string;
