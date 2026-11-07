@@ -8,6 +8,7 @@ Executes edge automotive telemetry inference with dual-engine fallback:
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -23,6 +24,7 @@ class ResilientMaintenanceInferenceEngine:
     Dual-engine failure predictor:
       - Tries ONNX Runtime first for maximum performance.
       - Automatically falls back to Scikit-Learn pipeline on runtime or hardware failure.
+      - Automatically loads and applies the cost-optimized decision threshold from model_metadata.json.
     """
 
     FEATURE_KEYS = [
@@ -38,12 +40,28 @@ class ResilientMaintenanceInferenceEngine:
 
         self.onnx_path = self.models_dir / "engine_failure_model.onnx"
         self.pipeline_path = self.models_dir / "predictive_maintenance_pipeline.joblib"
+        self.metadata_path = self.models_dir / "model_metadata.json"
 
         self.ort_session = None
         self.input_name = None
         self.sklearn_pipeline = None
+        self.optimal_threshold: float = 0.08  # Default fallback if metadata not present
 
         self._load_models()
+        self._load_metadata()
+
+    def _load_metadata(self):
+        """Loads cost-optimized threshold and feature specifications from training metadata."""
+        if self.metadata_path.exists():
+            try:
+                with open(self.metadata_path, "r") as f:
+                    meta = json.load(f)
+                    self.optimal_threshold = float(meta.get("optimal_threshold", 0.08))
+                    logger.info(f"Loaded calibrated optimal decision threshold: {self.optimal_threshold:.4f}")
+            except Exception as e:
+                logger.warning(f"Failed to read model metadata ({e}); using default threshold {self.optimal_threshold}")
+        else:
+            logger.info(f"Metadata file {self.metadata_path} not found; using default threshold {self.optimal_threshold}")
 
     def _load_models(self):
         # 1. Load Scikit-Learn Fallback Pipeline
@@ -69,19 +87,35 @@ class ResilientMaintenanceInferenceEngine:
         else:
             logger.warning(f"ONNX model not found at {self.onnx_path}; relying on Scikit-Learn fallback.")
 
-    def predict(self, feature_vector: Union[List[float], np.ndarray, Dict[str, float]], optimal_threshold: float = 0.08) -> Dict[str, Union[int, float, str, bool]]:
+    def predict(
+        self,
+        feature_vector: Union[List[float], np.ndarray, Dict[str, float]],
+        optimal_threshold: Optional[float] = None
+    ) -> Dict[str, Union[int, float, str, bool]]:
         """
-        Runs dual-engine inference with automatic failover.
+        Runs dual-engine inference with automatic failover and strict input validation.
         """
-        # Format input vector
+        threshold = self.optimal_threshold if optimal_threshold is None else optimal_threshold
+
+        # Strict input validation and dimensional checks
         if isinstance(feature_vector, dict):
-            arr = np.array([[feature_vector.get(k, 0.0) for k in self.FEATURE_KEYS]], dtype=np.float32)
+            missing = [k for k in self.FEATURE_KEYS if k not in feature_vector]
+            if missing:
+                raise ValueError(f"Missing required feature keys: {missing}")
+            arr = np.array([[feature_vector[k] for k in self.FEATURE_KEYS]], dtype=np.float32)
         else:
             arr = np.asarray(feature_vector, dtype=np.float32)
             if arr.ndim == 1:
                 arr = arr.reshape(1, -1)
+            if arr.ndim != 2 or arr.shape[1] != len(self.FEATURE_KEYS):
+                raise ValueError(
+                    f"Expected input shape (n, {len(self.FEATURE_KEYS)}), "
+                    f"received {arr.shape}"
+                )
+            if not np.isfinite(arr).all():
+                raise ValueError("Input contains NaN or infinite values.")
 
-        # Sanitize NaNs or Infs
+        # Extra safety sanitization pass
         arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
 
         engine_used = "onnx"
@@ -92,7 +126,6 @@ class ResilientMaintenanceInferenceEngine:
             try:
                 inputs = {self.input_name: arr}
                 outputs = self.ort_session.run(None, inputs)
-                # outputs[1] is probabilities map/array in skl2onnx classifier
                 if len(outputs) > 1 and isinstance(outputs[1], list) and isinstance(outputs[1][0], dict):
                     failure_prob = float(outputs[1][0].get(1, 0.0))
                 elif len(outputs) > 1 and isinstance(outputs[1], np.ndarray):
@@ -108,12 +141,12 @@ class ResilientMaintenanceInferenceEngine:
             engine_used = "sklearn"
             failure_prob = self._predict_sklearn(arr)
 
-        is_anomaly = bool(failure_prob >= optimal_threshold)
+        is_anomaly = bool(failure_prob >= threshold)
 
         return {
             "anomaly_detected": is_anomaly,
             "failure_probability": round(failure_prob, 4),
-            "decision_threshold": optimal_threshold,
+            "decision_threshold": round(threshold, 4),
             "engine": engine_used,
             "risk_level": "CRITICAL" if failure_prob >= 0.7 else "ELEVATED" if is_anomaly else "NOMINAL"
         }

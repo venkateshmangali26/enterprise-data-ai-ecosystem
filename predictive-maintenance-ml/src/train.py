@@ -176,12 +176,28 @@ def train_pipeline():
     print(classification_report(y_test, y_pred_opt, target_names=["Nominal", "Failure Risk"]))
 
     # Save artifacts
+    import json
     models_dir = Path(__file__).resolve().parent.parent / "models"
     models_dir.mkdir(exist_ok=True)
     joblib.dump(pipeline, models_dir / "predictive_maintenance_pipeline.joblib")
     joblib.dump(pipeline.named_steps["classifier"], models_dir / "predictive_maintenance_gbc.joblib")
     joblib.dump(pipeline.named_steps["scaler"], models_dir / "telemetry_scaler.joblib")
-    print(f"\nArtifacts successfully serialized to {models_dir}")
+    
+    metadata = {
+        "optimal_threshold": float(best_th),
+        "feature_count": int(df_features.shape[1]),
+        "feature_names": list(df_features.columns),
+        "cost_fn": 1500000.0,
+        "cost_fp": 15000.0,
+        "optimal_cost": float(opt_cost),
+        "default_cost": float(def_cost),
+        "savings": float(savings),
+        "roc_auc": float(roc_auc)
+    }
+    with open(models_dir / "model_metadata.json", "w") as f:
+        json.dump(metadata, f, indent=4)
+
+    print(f"\nArtifacts and metadata (threshold: {best_th:.4f}) successfully serialized to {models_dir}")
 
 
 if __name__ == "__main__":

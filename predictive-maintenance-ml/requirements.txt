@@ -7,4 +7,6 @@ onnx>=1.15.0
 onnxruntime>=1.17.0
 skl2onnx>=1.16.0
 matplotlib>=3.8.0
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
 

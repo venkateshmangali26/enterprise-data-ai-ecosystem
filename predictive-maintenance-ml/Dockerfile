@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 RUN mkdir -p models data
 
-# Execute training pipeline followed by ONNX export
-CMD ["sh", "-c", "python src/train.py && python src/export_onnx.py"]
+# Expose port for inference REST microservice
+EXPOSE 5000
+
+# Execute server with model verification
+CMD ["python", "src/server.py"]
 

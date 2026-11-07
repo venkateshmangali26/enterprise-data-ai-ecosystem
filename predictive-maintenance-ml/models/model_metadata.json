@@ -1,0 +1,25 @@
+{
+    "optimal_threshold": 0.08,
+    "feature_count": 13,
+    "feature_names": [
+        "rms",
+        "peak_to_peak",
+        "crest_factor",
+        "variance",
+        "mean_abs",
+        "shape_factor",
+        "impulse_factor",
+        "margin_factor",
+        "skewness",
+        "kurtosis",
+        "spectral_energy",
+        "spectral_centroid",
+        "spectral_spread"
+    ],
+    "cost_fn": 1500000.0,
+    "cost_fp": 15000.0,
+    "optimal_cost": 1755000.0,
+    "default_cost": 15120000.0,
+    "savings": 13365000.0,
+    "roc_auc": 0.998425
+}

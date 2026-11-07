@@ -301,19 +301,24 @@ class TestFastAPIIntegration:
         assert "x-response-time-ms" in res.headers
 
     def test_ast_security_allows_safe_math(self, client):
-        payload = {"expression": "round(abs(-15.75) + pow(2, 3), 2)"}
+        payload = {"expression": "round(abs(-15.75) + 8.0, 2)"}
         res = client.post("/api/telemetry/evaluate-formula", json=payload)
         assert res.status_code == 200
         data = res.json()
         assert data["valid"] is True
         assert data["result"] == 23.75
 
-    def test_ast_security_blocks_malicious_rce(self, client):
+    def test_ast_security_blocks_malicious_rce_and_expensive_ops(self, client):
         dangerous_payloads = [
             "__import__('os').system('ls')",
             "open('/etc/passwd').read()",
             "eval('2+2')",
-            "[x for x in ().__class__.__bases__[0].__subclasses__()]"
+            "[x for x in ().__class__.__bases__[0].__subclasses__()]",
+            "2 ** 100",  # Exponentiation blocked (Error 5)
+            "pow(2, 3)", # Disallowed function call
+            "1 + " * 35 + "1",  # Exceeds node count limit of 30
+            "1" * 250,          # Exceeds length limit of 200 chars
+            "1e15 + 5"          # Exceeds magnitude limit of 1e12
         ]
         for expr in dangerous_payloads:
             res = client.post("/api/telemetry/evaluate-formula", json={"expression": expr})

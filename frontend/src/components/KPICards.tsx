@@ -33,14 +33,18 @@ export const KPICards: React.FC<KPICardsProps> = ({ kpis, isLoading }) => {
     );
   }
 
-  const isMomPositive = (kpis.mom_growth_pct ?? 0) >= 0;
+  const hasMom = kpis.mom_growth_pct !== null && kpis.mom_growth_pct !== undefined;
+  const isMomPositive = hasMom ? (kpis.mom_growth_pct as number) >= 0 : false;
+  const momTrendText = hasMom
+    ? `${isMomPositive ? "+" : ""}${kpis.mom_growth_pct}% MoM`
+    : "N/A MoM";
 
   const cards = [
     {
       title: "Total Net Revenue (GMV)",
       value: formatINR(kpis.total_revenue),
       subtext: `Cost of Goods: ${formatINR(kpis.total_cost)}`,
-      trend: `${isMomPositive ? "+" : ""}${kpis.mom_growth_pct}% MoM`,
+      trend: momTrendText,
       isPositive: isMomPositive,
       icon: IndianRupee,
       barPercent: Math.min(100, Math.max(10, Math.round((kpis.gross_profit / kpis.total_revenue) * 100))),

@@ -4,6 +4,9 @@ import path from "path";
 const dbPath = process.env.DATABASE_PATH || process.env.DB_PATH || path.resolve(__dirname, "../retail_analytics.db");
 export const db = new Database(dbPath, { create: true });
 
+// Enable foreign key constraint enforcement
+db.exec("PRAGMA foreign_keys = ON;");
+
 // Enable Write-Ahead Logging (WAL) and memory optimizations for high throughput
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA synchronous = NORMAL;");

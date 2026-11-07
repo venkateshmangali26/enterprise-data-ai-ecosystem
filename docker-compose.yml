@@ -58,20 +58,29 @@ services:
       - enterprise-network
 
   # ============================================================================
-  # Pillar 3: Predictive Maintenance MLOps Pipeline (Batch & Export Job)
-  # Run on demand: docker compose --profile all up OR docker compose run mlops-pipeline
+  # Pillar 3: Predictive Maintenance MLOps Inference Service
+  # Dual-Engine ONNX / Scikit-Learn Edge Inference API
   # ============================================================================
-  mlops-pipeline:
+  predictive-maintenance-ml:
     container_name: predictive-maintenance-mlops
     build:
       context: ./predictive-maintenance-ml
       dockerfile: Dockerfile
-    profiles:
-      - mlops
-      - all
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - HOST=0.0.0.0
     volumes:
       # Sync trained .joblib & exported .onnx models back to host disk
       - ./predictive-maintenance-ml/models:/app/models
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     networks:
       - enterprise-network
 

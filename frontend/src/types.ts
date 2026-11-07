@@ -8,7 +8,7 @@ export interface OverviewKPIs {
   active_customers: number;
   average_order_value: number;
   avg_discount_pct: number;
-  mom_growth_pct: number;
+  mom_growth_pct: number | null;
   current_month_revenue: number;
   prior_month_revenue: number;
 }

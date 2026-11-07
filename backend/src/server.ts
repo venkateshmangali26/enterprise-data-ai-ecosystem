@@ -8,19 +8,39 @@ const DIST_DIR = process.env.DIST_DIR || path.resolve(__dirname, "../../frontend
 
 initDatabaseSchema();
 
-function jsonResponse(data: unknown, status = 200) {
+const ALLOWED_ORIGINS = (
+  process.env.ALLOWED_ORIGINS ||
+  process.env.FRONTEND_ORIGIN ||
+  "http://localhost:5173,http://localhost:3000,http://localhost:3001,http://127.0.0.1:5173,http://127.0.0.1:3001"
+)
+  .split(",")
+  .map((s) => s.trim());
+
+function getCorsHeaders(req?: Request): Record<string, string> {
+  const origin = req?.headers.get("origin");
+  let allowed = ALLOWED_ORIGINS[0];
+  if (origin && (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes("*"))) {
+    allowed = origin;
+  }
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Vary": "Origin",
+  };
+}
+
+function jsonResponse(data: unknown, status = 200, req?: Request) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      ...getCorsHeaders(req),
     },
   });
 }
 
-function jsonError(message: string, status = 500, path?: string) {
+function jsonError(message: string, status = 500, path?: string, req?: Request) {
   return new Response(JSON.stringify({
     ok: false,
     error: message,
@@ -30,9 +50,7 @@ function jsonError(message: string, status = 500, path?: string) {
     status,
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      ...getCorsHeaders(req),
     },
   });
 }
@@ -46,11 +64,7 @@ const server = Bun.serve({
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
       return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        },
+        headers: getCorsHeaders(req),
       });
     }
 
@@ -135,10 +149,10 @@ const server = Bun.serve({
 
         return jsonResponse({
           ...kpis,
-          mom_growth_pct: mom?.mom_growth_pct ?? 4.2,
+          mom_growth_pct: mom?.mom_growth_pct ?? null,
           current_month_revenue: mom?.current_month_revenue ?? 0,
           prior_month_revenue: mom?.prior_month_revenue ?? 0,
-        });
+        }, 200, req);
       }
 
       // 3. Query 1: Revenue Trends (MoM Growth & Running YTD by Region)
@@ -300,8 +314,8 @@ const server = Bun.serve({
               CASE 
                 WHEN r_score >= 4 AND f_score >= 4 AND m_score >= 4 THEN 'Champions'
                 WHEN r_score >= 3 AND f_score >= 3 AND m_score >= 3 THEN 'Loyal Customers'
-                WHEN r_score >= 4 AND f_score <= 3 THEN 'Potential Loyalists'
                 WHEN r_score >= 4 AND f_score = 1 THEN 'Recent Customers'
+                WHEN r_score >= 4 AND f_score <= 3 THEN 'Potential Loyalists'
                 WHEN r_score <= 2 AND f_score >= 3 AND m_score >= 3 THEN 'At Risk'
                 WHEN r_score = 1 AND f_score >= 4 THEN 'Cannot Lose Them'
                 WHEN r_score <= 2 AND f_score <= 2 THEN 'Hibernating / Lost'
