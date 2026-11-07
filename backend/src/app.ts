@@ -1,7 +1,34 @@
 import { db, initDatabaseSchema } from "./db";
 import path from "path";
-import { existsSync, statSync } from "fs";
+import { existsSync, statSync, readFileSync } from "fs";
 import { timingSafeEqual } from "node:crypto";
+
+// Fallback loader for .env from backend/.env or root .env regardless of working directory
+const possibleEnvPaths = [
+  path.resolve(import.meta.dir, "../.env"),
+  path.resolve(import.meta.dir, "../../.env"),
+];
+for (const envPath of possibleEnvPaths) {
+  if (existsSync(envPath)) {
+    try {
+      const content = readFileSync(envPath, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const idx = trimmed.indexOf("=");
+        if (idx !== -1) {
+          const key = trimmed.slice(0, idx).trim();
+          const val = trimmed.slice(idx + 1).trim();
+          if (!process.env[key]) {
+            process.env[key] = val;
+          }
+        }
+      }
+    } catch {
+      // Ignore env read error
+    }
+  }
+}
 
 // Initialize database schema on module load
 initDatabaseSchema();
