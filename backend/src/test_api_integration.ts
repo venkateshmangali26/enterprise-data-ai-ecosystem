@@ -80,6 +80,10 @@ async function runIntegrationTests() {
     });
     assert(invalidAuthRes.status === 401, "2. Security: Invalid bearer token returns HTTP 401");
 
+    // Unknown API routes without auth require authentication before 404 handler
+    const { res: protected404Res } = await testApi("/api/unknown-endpoint-xyz", {}, false);
+    assert(protected404Res.status === 401, "2. Security: Unknown API routes require authentication");
+
     // -------------------------------------------------------------
     // Group 3: Executive Overview KPIs (Authenticated)
     // -------------------------------------------------------------
@@ -196,7 +200,7 @@ async function runIntegrationTests() {
     assert(unknownTxRes.status === 404, "14. Unknown transaction ID returns HTTP 404");
 
     // -------------------------------------------------------------
-    // Group 11: Security, CORS Origin Validation, Preflight, & HTTP Method Guard
+    // Group 11: Security, CORS Origin Validation, Realistic Preflight, & HTTP Method Guard
     // -------------------------------------------------------------
     // Authorized origin CORS reflection (literal string without markdown link syntax)
     const allowedOrigin = "http://localhost:5173";
@@ -222,19 +226,30 @@ async function runIntegrationTests() {
       "15. Unauthorized CORS origin receives no Access-Control-Allow-Origin header"
     );
 
-    // OPTIONS preflight check
-    const { res: preflightRes } = await testApi("/api/overview", { method: "OPTIONS" });
+    // Realistic browser preflight request with Origin and Request headers
+    const { res: preflightRes } = await testApi("/api/overview", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization",
+      },
+    });
     assert(preflightRes.status === 204, "16. OPTIONS preflight request returns HTTP 204 No Content");
     assert(preflightRes.headers.get("Access-Control-Allow-Methods") === "GET, OPTIONS", "16. OPTIONS preflight matches allowed methods GET, OPTIONS");
+    assert(
+      preflightRes.headers.get("Access-Control-Allow-Origin") === "http://localhost:5173",
+      "16. Preflight permits configured frontend origin"
+    );
 
     // Method Guard: Reject POST on read endpoint
     const { res: methodRes, json: methodJson } = await testApi("/api/overview", { method: "POST" });
     assert(methodRes.status === 405, "17. POST on /api/overview rejected with HTTP 405 Method Not Allowed");
     assert((methodJson as any)?.error === "Method Not Allowed", "17. Error message correctly specifies Method Not Allowed");
 
-    // Unknown API endpoint 404 guard
+    // Unknown API endpoint 404 guard (authenticated)
     const { res: notFoundRes, json: notFoundJson } = await testApi("/api/unknown-endpoint-xyz");
-    assert(notFoundRes.status === 404, "18. Unknown API route returns HTTP 404");
+    assert(notFoundRes.status === 404, "18. Unknown API route returns HTTP 404 when authenticated");
     assert((notFoundJson as any)?.error === "API Endpoint Not Found", "18. Correct 404 error message returned for unknown route");
 
   } catch (error) {
@@ -246,9 +261,7 @@ async function runIntegrationTests() {
   console.log(`  INTEGRATION TEST RESULTS: ${passed} PASSED, ${failed} FAILED  `);
   console.log("=======================================================");
 
-  if (failed > 0) {
-    process.exit(1);
-  }
+  process.exitCode = failed > 0 ? 1 : 0;
 }
 
 await runIntegrationTests();

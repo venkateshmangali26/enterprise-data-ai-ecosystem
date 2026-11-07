@@ -5,7 +5,8 @@
   "scripts": {
     "seed": "bun run src/seed.ts",
     "dev": "bun --watch src/server.ts",
-    "start": "bun run src/server.ts"
+    "start": "bun run src/server.ts",
+    "test": "bun run src/test_api_integration.ts"
   }
 }
 
