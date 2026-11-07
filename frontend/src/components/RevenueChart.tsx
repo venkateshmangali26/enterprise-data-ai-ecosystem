@@ -8,57 +8,87 @@ interface RevenueChartProps {
   selectedRegion: string;
 }
 
+interface EChartsTooltipItem {
+  dataIndex: number;
+  seriesName?: string;
+  value?: number | string;
+}
+
 export const RevenueChart: React.FC<RevenueChartProps> = ({
   data,
   isDark,
   selectedRegion,
 }) => {
-  const [selectedYear, setSelectedYear] = useState<number>(2025);
+  const availableYears = useMemo(
+    () => [...new Set(data.map((row) => row.year))].filter(Boolean).sort((a, b) => a - b),
+    [data]
+  );
 
-  const filteredData = useMemo(() => {
-    return data.filter((d) => d.year === selectedYear);
-  }, [data, selectedYear]);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
-  // Aggregate monthly if "All" regions selected, or take specific region
+  const activeYear =
+    selectedYear !== null && availableYears.includes(selectedYear)
+      ? selectedYear
+      : availableYears[availableYears.length - 1] ?? 2025;
+
+  const displayYears = availableYears.length > 0 ? availableYears : [2023, 2024, 2025];
+
+  // Aggregate monthly revenue by calendar month for the active year and selected region
   const monthlyAgg = useMemo(() => {
-    const map = new Map<number, {
-      monthName: string;
-      revenue: number;
-      prevRevenue: number;
-      ytd: number;
-      orders: number;
-    }>();
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
 
-    filteredData.forEach((row) => {
-      const existing = map.get(row.month) || {
-        monthName: row.month_short,
-        revenue: 0,
-        prevRevenue: 0,
-        ytd: 0,
-        orders: 0,
-      };
-      existing.revenue += row.monthly_revenue || 0;
-      existing.prevRevenue += row.prev_month_revenue || 0;
-      existing.ytd += row.running_ytd_revenue || 0;
-      existing.orders += row.order_count;
-      map.set(row.month, existing);
-    });
+    const totals = Array.from({ length: 12 }, (_, index) => ({
+      month: index + 1,
+      monthName: monthNames[index],
+      revenue: 0,
+      orders: 0,
+    }));
 
-    const sortedMonths = Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-    return sortedMonths.map(([m, vals]) => {
-      const momPct = vals.prevRevenue > 0
-        ? Math.round(((vals.revenue - vals.prevRevenue) / vals.prevRevenue) * 1000) / 10
-        : 0;
+    data
+      .filter((row) => {
+        const matchesYear = row.year === activeYear;
+        const matchesRegion = !selectedRegion || selectedRegion === "All" || row.region === selectedRegion;
+        return matchesYear && matchesRegion;
+      })
+      .forEach((row) => {
+        const index = row.month - 1;
+        if (index < 0 || index > 11) return;
+
+        totals[index].revenue += Number(row.monthly_revenue) || 0;
+        totals[index].orders += Number(row.order_count) || 0;
+
+        if (row.month_short) {
+          totals[index].monthName = row.month_short;
+        }
+      });
+
+    let runningYtd = 0;
+
+    return totals.map((item, index) => {
+      runningYtd += item.revenue;
+
+      const previousRevenue = index > 0 ? totals[index - 1].revenue : null;
+
+      const momPct =
+        previousRevenue !== null && previousRevenue > 0
+          ? Number(
+              (
+                ((item.revenue - previousRevenue) / previousRevenue) * 100
+              ).toFixed(1)
+            )
+          : null;
+
       return {
-        month: m,
-        monthName: vals.monthName,
-        revenue: Math.round(vals.revenue),
-        ytd: Math.round(vals.ytd),
+        ...item,
+        revenue: Number(item.revenue.toFixed(2)),
+        ytd: Number(runningYtd.toFixed(2)),
         momPct,
-        orders: vals.orders,
       };
     });
-  }, [filteredData]);
+  }, [data, activeYear, selectedRegion]);
 
   const option = useMemo(() => {
     const textColor = isDark ? "#a1a1aa" : "#71717a";
@@ -66,8 +96,8 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
     const axisLineColor = isDark ? "#27272a" : "#e4e4e7";
 
     const months = monthlyAgg.map((d) => d.monthName);
-    const revenues = monthlyAgg.map((d) => (d.revenue / 10_000_000).toFixed(2)); // in Crores
-    const ytds = monthlyAgg.map((d) => (d.ytd / 10_000_000).toFixed(2)); // in Crores
+    const revenues = monthlyAgg.map((d) => d.revenue / 10_000_000); // in Crores (numeric)
+    const ytds = monthlyAgg.map((d) => d.ytd / 10_000_000); // in Crores (numeric)
 
     return {
       backgroundColor: "transparent",
@@ -76,14 +106,28 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
         backgroundColor: isDark ? "#18181b" : "#ffffff",
         borderColor: isDark ? "#27272a" : "#e4e4e7",
         textStyle: { color: isDark ? "#fafafa" : "#09090b", fontSize: 12 },
-        formatter: (params: any) => {
-          if (!params || !params.length) return "";
-          const idx = params[0].dataIndex;
+        formatter: (params: unknown) => {
+          const pList = Array.isArray(params) ? (params as EChartsTooltipItem[]) : [];
+          if (!pList.length) return "";
+          const idx = pList[0].dataIndex;
           const item = monthlyAgg[idx];
+          if (!item) return "";
+
           const isFestivePeak = item.month === 10 || item.month === 11;
+          const momText =
+            item.momPct === null
+              ? "N/A"
+              : `${item.momPct >= 0 ? "+" : ""}${item.momPct}%`;
+          const momColor =
+            item.momPct === null
+              ? "#a1a1aa"
+              : item.momPct >= 0
+              ? "#10b981"
+              : "#f43f5e";
+
           return `
             <div style="font-weight: 600; margin-bottom: 4px; font-family: monospace;">
-              ${item.monthName} ${selectedYear} ${isFestivePeak ? "🪔 (Festive Diwali Peak)" : ""}
+              ${item.monthName} ${activeYear} ${isFestivePeak ? "🪔 (Festive Diwali Peak)" : ""}
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px;">
               <span style="color:#f97316">● Monthly Net Revenue:</span>
@@ -94,8 +138,8 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
               <span style="font-weight:bold">₹${(item.ytd / 10_000_000).toFixed(2)} Cr</span>
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px;">
-              <span style="color:${item.momPct >= 0 ? '#10b981' : '#f43f5e'}">● MoM Growth:</span>
-              <span style="font-weight:bold">${item.momPct >= 0 ? '+' : ''}${item.momPct}%</span>
+              <span style="color:${momColor}">● MoM Growth:</span>
+              <span style="font-weight:bold">${momText}</span>
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px; margin-top:4px; font-size:11px; color:#a1a1aa">
               <span>Orders Dispatched:</span>
@@ -188,7 +232,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
         },
       ],
     };
-  }, [monthlyAgg, isDark, selectedYear]);
+  }, [monthlyAgg, isDark, activeYear]);
 
   return (
     <div className="p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0c0c0f] shadow-sm">
@@ -209,14 +253,15 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
 
         {/* Year Selector Pills */}
         <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800">
-          {[2023, 2024, 2025].map((y) => (
+          {displayYears.map((y) => (
             <button
               key={y}
               onClick={() => setSelectedYear(y)}
-              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${selectedYear === y
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                activeYear === y
                   ? "bg-white dark:bg-zinc-800 text-orange-600 dark:text-orange-400 shadow-sm"
                   : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-                }`}
+              }`}
             >
               FY {y}
             </button>
