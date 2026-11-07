@@ -213,11 +213,10 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
             <button
               key={y}
               onClick={() => setSelectedYear(y)}
-              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                selectedYear === y
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${selectedYear === y
                   ? "bg-white dark:bg-zinc-800 text-orange-600 dark:text-orange-400 shadow-sm"
                   : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
+                }`}
             >
               FY {y}
             </button>
