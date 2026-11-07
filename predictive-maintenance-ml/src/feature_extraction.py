@@ -16,20 +16,25 @@ from scipy import stats
 def extract_signal_features(sig: np.ndarray) -> Dict[str, float]:
     """
     Extracts comprehensive time-domain and frequency-domain features from a 1D sensor signal.
+    Hardened against sensor dropouts, packet drops, NaNs, and infinite bursts.
     
     Parameters:
         sig (np.ndarray): 1D continuous sensor readings array.
         
     Returns:
-        Dict[str, float]: Statistical and spectral indicators.
+        Dict[str, float]: Sanitized statistical and spectral indicators.
     """
-    sig = np.asarray(sig, dtype=np.float64)
-    norm_sig = sig - np.mean(sig)
+    # Enforce float64 array and robust imputation for packet dropouts
+    sig_arr = np.asarray(sig, dtype=np.float64)
+    sig_clean = np.nan_to_num(sig_arr, nan=0.0, posinf=1.0, neginf=-1.0)
+    
+    # Baseline de-meaning
+    norm_sig = sig_clean - np.mean(sig_clean)
 
     # 1. Time-Domain Statistical Moments
     rms = float(np.sqrt(np.mean(norm_sig**2))) + 1e-8
-    peak = float(np.max(np.abs(norm_sig)))
-    ptp = float(np.ptp(norm_sig))
+    peak = float(np.max(np.abs(norm_sig))) if len(norm_sig) > 0 else 0.0
+    ptp = float(np.ptp(norm_sig)) if len(norm_sig) > 0 else 0.0
     variance = float(np.var(norm_sig))
     mean_abs = float(np.mean(np.abs(norm_sig))) + 1e-8
 
@@ -40,34 +45,42 @@ def extract_signal_features(sig: np.ndarray) -> Dict[str, float]:
     margin_factor = peak / (float(np.mean(np.sqrt(np.abs(norm_sig))))**2 + 1e-8)
 
     # Higher-order statistical moments
-    skewness = float(stats.skew(norm_sig))
-    kurtosis = float(stats.kurtosis(norm_sig)) # Fisher's kurtosis (excess kurtosis, 0 for normal)
+    skewness = float(stats.skew(norm_sig)) if len(norm_sig) > 2 else 0.0
+    kurtosis = float(stats.kurtosis(norm_sig)) if len(norm_sig) > 3 else 0.0 # Fisher's excess kurtosis
 
     # 2. Frequency-Domain Spectral Indicators (via FFT)
-    n = len(norm_sig)
+    n = max(len(norm_sig), 1)
     fft_vals = np.abs(np.fft.rfft(norm_sig))
-    fft_freqs = np.fft.rfftfreq(n, d=1.0 / 300.0) # Assume 300Hz sampling baseline
+    fft_freqs = np.fft.rfftfreq(n, d=1.0 / 300.0) # 300Hz sampling baseline
 
     spectral_energy = float(np.sum(fft_vals**2) / (n + 1e-8))
     sum_fft = float(np.sum(fft_vals)) + 1e-8
     spectral_centroid = float(np.sum(fft_freqs * fft_vals) / sum_fft)
     spectral_spread = float(np.sqrt(np.sum(((fft_freqs - spectral_centroid)**2) * fft_vals) / sum_fft))
 
-    return {
-        "rms": round(rms, 5),
-        "peak_to_peak": round(ptp, 5),
-        "crest_factor": round(crest_factor, 5),
-        "variance": round(variance, 5),
-        "mean_abs": round(mean_abs, 5),
-        "shape_factor": round(shape_factor, 5),
-        "impulse_factor": round(impulse_factor, 5),
-        "margin_factor": round(margin_factor, 5),
-        "skewness": round(skewness, 5),
-        "kurtosis": round(kurtosis, 5),
-        "spectral_energy": round(spectral_energy, 5),
-        "spectral_centroid": round(spectral_centroid, 5),
-        "spectral_spread": round(spectral_spread, 5),
+    raw_features = {
+        "rms": rms,
+        "peak_to_peak": ptp,
+        "crest_factor": crest_factor,
+        "variance": variance,
+        "mean_abs": mean_abs,
+        "shape_factor": shape_factor,
+        "impulse_factor": impulse_factor,
+        "margin_factor": margin_factor,
+        "skewness": skewness,
+        "kurtosis": kurtosis,
+        "spectral_energy": spectral_energy,
+        "spectral_centroid": spectral_centroid,
+        "spectral_spread": spectral_spread,
     }
+
+    # Final sanitization pass: zero-impute any NaN or infinite moments
+    sanitized = {}
+    for k, v in raw_features.items():
+        val = float(np.nan_to_num(v, nan=0.0, posinf=1.0, neginf=-1.0))
+        sanitized[k] = round(val, 5)
+
+    return sanitized
 
 
 def extract_batch_features(signals: Union[np.ndarray, List[List[float]]]) -> pd.DataFrame:

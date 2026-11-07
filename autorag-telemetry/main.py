@@ -12,6 +12,8 @@ Stack & Architectural Guarantees:
 
 from __future__ import annotations
 
+import ast
+import builtins
 import logging
 import os
 import re
@@ -115,6 +117,17 @@ class FailurePredictionResponse(BaseModel):
     features: TelemetryFeatures
     recommended_action: str
     estimated_intervention_cost: float
+
+
+class DiagnosticExpressionPayload(BaseModel):
+    expression: str = Field(..., min_length=1, max_length=500, description="Diagnostic telemetry math expression or formula")
+
+
+class ExpressionValidationResponse(BaseModel):
+    valid: bool
+    sanitized_expression: str
+    result: Optional[float] = None
+    reason: Optional[str] = None
 
 
 # =============================================================================
@@ -337,6 +350,47 @@ class PromptDefenseEngine:
             if pattern.search(user_query):
                 return True, "Security policy violation: Delimiter tampering or adversarial prompt injection detected."
         return False, ""
+
+
+class ASTSecurityValidator:
+    """
+    Validates diagnostic telemetry expressions or python code snippets via Abstract Syntax Tree (AST).
+    Only allows mathematical expressions, safe numeric literals, and whitelisted operators.
+    Rejects dangerous constructs: calls to os/subprocess, imports, eval, exec, file I/O, attribute traversal.
+    """
+    ALLOWED_NODE_TYPES = {
+        ast.Expression, ast.Expr, ast.Constant,
+        ast.BinOp, ast.UnaryOp, ast.Compare,
+        ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow,
+        ast.UAdd, ast.USub, ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE,
+        ast.List, ast.Tuple, ast.Load, ast.Name, ast.Call
+    }
+
+    ALLOWED_FUNCTIONS = {
+        "abs", "min", "max", "round", "pow", "sum", "len"
+    }
+
+    @classmethod
+    def validate(cls, code_snippet: str) -> Tuple[bool, Optional[str]]:
+        """Parses and verifies expression string against safe AST nodes and function calls."""
+        try:
+            tree = ast.parse(code_snippet.strip(), mode="eval")
+        except SyntaxError as e:
+            return False, f"Syntax error in expression: {e}"
+
+        for node in ast.walk(tree):
+            if type(node) not in cls.ALLOWED_NODE_TYPES:
+                return False, f"Security violation: Disallowed AST construct '{type(node).__name__}'."
+            if isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name):
+                    if node.func.id not in cls.ALLOWED_FUNCTIONS:
+                        return False, f"Security violation: Disallowed function call '{node.func.id}()'."
+                else:
+                    return False, "Security violation: Complex callable or attribute traversal disallowed."
+            if isinstance(node, ast.Attribute):
+                return False, "Security violation: Object attribute access disallowed."
+
+        return True, None
 
 
 class LLMSynthesizer:
@@ -763,6 +817,40 @@ async def query_rag(payload: QueryRequest):
 async def predict_failure(payload: TelemetrySensorPayload):
     """Evaluates raw vibration/pressure time-series against the calibrated IsolationForest model."""
     return ml_service.predict(payload.sensor_readings)
+
+
+@app.post("/api/telemetry/evaluate-formula", response_model=ExpressionValidationResponse, tags=["Telemetry Safety"])
+async def evaluate_diagnostic_formula(payload: DiagnosticExpressionPayload):
+    """
+    Parses incoming diagnostic telemetry formula into an Abstract Syntax Tree (AST),
+    validating node types against an allowlist before execution.
+    Rejects disallowed nodes (RCE attempts, imports, file operations) with 400 Bad Request.
+    """
+    is_valid, reason = ASTSecurityValidator.validate(payload.expression)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"AST Security Validation Failed: {reason}"
+        )
+
+    safe_globals = {
+        f: getattr(builtins, f)
+        for f in ASTSecurityValidator.ALLOWED_FUNCTIONS
+        if hasattr(builtins, f)
+    }
+    safe_globals["__builtins__"] = {}
+    try:
+        val = float(eval(payload.expression, safe_globals, {}))
+        return ExpressionValidationResponse(
+            valid=True,
+            sanitized_expression=payload.expression,
+            result=round(val, 4)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Evaluation error: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

@@ -20,6 +20,23 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+function jsonError(message: string, status = 500, path?: string) {
+  return new Response(JSON.stringify({
+    ok: false,
+    error: message,
+    path,
+    timestamp: new Date().toISOString(),
+  }), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
 const server = Bun.serve({
   hostname: HOST,
   port: PORT,
@@ -461,7 +478,7 @@ const server = Bun.serve({
 
       // 10. API 404 Guard (prevents API routes from falling through to HTML SPA fallback)
       if (url.pathname.startsWith("/api/")) {
-        return jsonResponse({ error: "API Endpoint Not Found", path: url.pathname }, 404);
+        return jsonError("API Endpoint Not Found", 404, url.pathname);
       }
 
       // 11. Serve Frontend Static Build (Production SPA Fallback)
@@ -480,11 +497,11 @@ const server = Bun.serve({
         }
       }
 
-      return jsonResponse({ error: "Not Found" }, 404);
+      return jsonError("Not Found", 404, url.pathname);
     } catch (err: unknown) {
-      console.error("API Error:", err);
+      console.error(`[Retail API Error] ${req.method} ${url.pathname}:`, err);
       const msg = err instanceof Error ? err.message : String(err);
-      return jsonResponse({ error: msg }, 500);
+      return jsonError(msg, 500, url.pathname);
     }
   },
 });

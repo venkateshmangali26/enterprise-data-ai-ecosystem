@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from main import (
     app,
     PromptDefenseEngine,
+    ASTSecurityValidator,
     DenseVectorStore,
     LLMSynthesizer,
     PredictiveMaintenanceML,
@@ -298,6 +299,26 @@ class TestFastAPIIntegration:
         res = client.get("/api/health")
         assert "x-request-id" in res.headers
         assert "x-response-time-ms" in res.headers
+
+    def test_ast_security_allows_safe_math(self, client):
+        payload = {"expression": "round(abs(-15.75) + pow(2, 3), 2)"}
+        res = client.post("/api/telemetry/evaluate-formula", json=payload)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["valid"] is True
+        assert data["result"] == 23.75
+
+    def test_ast_security_blocks_malicious_rce(self, client):
+        dangerous_payloads = [
+            "__import__('os').system('ls')",
+            "open('/etc/passwd').read()",
+            "eval('2+2')",
+            "[x for x in ().__class__.__bases__[0].__subclasses__()]"
+        ]
+        for expr in dangerous_payloads:
+            res = client.post("/api/telemetry/evaluate-formula", json={"expression": expr})
+            assert res.status_code == 400
+            assert "AST Security Validation Failed" in res.json()["detail"]
 
 
 if __name__ == "__main__":

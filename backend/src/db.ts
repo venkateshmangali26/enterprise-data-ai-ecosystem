@@ -7,6 +7,7 @@ export const db = new Database(dbPath, { create: true });
 // Enable Write-Ahead Logging (WAL) and memory optimizations for high throughput
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA synchronous = NORMAL;");
+db.exec("PRAGMA busy_timeout = 5000;"); // Wait up to 5s before throwing SQLITE_BUSY under concurrency
 db.exec("PRAGMA temp_store = MEMORY;");
 db.exec("PRAGMA cache_size = -64000;"); // 64MB cache
 
