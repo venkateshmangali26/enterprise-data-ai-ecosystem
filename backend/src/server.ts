@@ -213,6 +213,7 @@ const server = Bun.serve({
             month_name,
             period,
             monthly_revenue,
+            monthly_profit,
             COALESCE(prev_month_revenue, 0) AS prev_month_revenue,
             ROUND(100.0 * (monthly_revenue - prev_month_revenue) / NULLIF(prev_month_revenue, 0), 2) AS mom_growth_pct,
             running_ytd_revenue,
@@ -351,7 +352,9 @@ const server = Bun.serve({
             ROUND(SUM(f.gross_profit), 2) AS gross_profit,
             ROUND(100.0 * SUM(f.gross_profit) / NULLIF(SUM(f.net_revenue), 0), 2) AS profit_margin_pct,
             SUM(f.quantity) AS total_units_sold,
-            COUNT(DISTINCT f.order_id) AS total_orders
+            SUM(f.quantity) AS units_sold,
+            COUNT(DISTINCT f.order_id) AS total_orders,
+            COUNT(DISTINCT f.order_id) AS order_count
           FROM fact_transactions f
           JOIN dim_products p ON f.product_id = p.product_id
           GROUP BY p.category, p.sub_category
@@ -431,6 +434,7 @@ const server = Bun.serve({
             f.order_date,
             s.store_id,
             s.store_name,
+            s.city,
             s.region,
             p.product_id,
             p.product_name,
