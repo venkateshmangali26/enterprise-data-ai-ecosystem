@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar } from "./components/Navbar";
 import { KPICards } from "./components/KPICards";
 import { RevenueChart } from "./components/RevenueChart";
@@ -27,27 +27,14 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
-// Dynamic token resolution from session storage, URL param, or build-time env (no secrets hardcoded in frontend bundle)
+// Token resolution from session storage only (no secrets baked into frontend bundle)
 const getAuthHeaders = (): HeadersInit => {
   if (typeof window !== "undefined") {
-    const fromStorage =
-      window.sessionStorage.getItem("retail_api_token") ||
-      window.localStorage.getItem("retail_api_token");
-    if (fromStorage) return { Authorization: `Bearer ${fromStorage}` };
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const fromUrl = urlParams.get("token");
-    if (fromUrl) {
-      window.sessionStorage.setItem("retail_api_token", fromUrl);
-      return { Authorization: `Bearer ${fromUrl}` };
+    const token = window.sessionStorage.getItem("retail_api_token");
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
     }
   }
-
-  const envToken = import.meta.env.VITE_API_TOKEN;
-  if (envToken) {
-    return { Authorization: `Bearer ${envToken}` };
-  }
-
   return {};
 };
 
@@ -55,6 +42,7 @@ export function App() {
   const [isDark, setIsDark] = useState<boolean>(true);
   const [selectedRegion, setSelectedRegion] = useState<string>("All");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [selectedStoreId, setSelectedStoreId] = useState<string>("All");
 
   // Data states
   const [kpis, setKpis] = useState<OverviewKPIs | null>(null);
@@ -71,7 +59,16 @@ export function App() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionItem | null>(null);
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Independent loading states
+  const [isOverviewLoading, setIsOverviewLoading] = useState<boolean>(true);
+  const [isTransactionsLoading, setIsTransactionsLoading] = useState<boolean>(true);
+
+  // Connection & Data Source Status
+  const [isLiveDatabase, setIsLiveDatabase] = useState<boolean>(true);
+
+  // AbortController refs to prevent race conditions from out-of-order responses
+  const dataAbortRef = useRef<AbortController | null>(null);
+  const txAbortRef = useRef<AbortController | null>(null);
 
   // Sync theme class
   useEffect(() => {
@@ -84,65 +81,75 @@ export function App() {
 
   const toggleTheme = () => setIsDark((prev) => !prev);
 
-  // Fetch overview & analytics data (with automatic offline / Vercel fallback)
+  // Fetch overview & analytics data with race condition protection
   const fetchData = useCallback(async () => {
-    setIsLoading(true);
+    if (dataAbortRef.current) {
+      dataAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    dataAbortRef.current = controller;
+
+    setIsOverviewLoading(true);
     try {
       const qRegion = selectedRegion !== "All" ? `&region=${encodeURIComponent(selectedRegion)}` : "";
       const qCategory = selectedCategory !== "All" ? `&category=${encodeURIComponent(selectedCategory)}` : "";
 
       const authHeaders = getAuthHeaders();
+      const signal = controller.signal;
+
       const [kpiRes, revRes, storeRes, segRes, catRes] = await Promise.all([
-        fetch(`${API_BASE}/api/overview?_t=${Date.now()}${qRegion}${qCategory}`, { headers: authHeaders }).catch(() => null),
-        fetch(`${API_BASE}/api/revenue-trend?_t=${Date.now()}${qRegion}`, { headers: authHeaders }).catch(() => null),
-        fetch(`${API_BASE}/api/stores/top?limit=10${qRegion}`, { headers: authHeaders }).catch(() => null),
-        fetch(`${API_BASE}/api/customer-segments`, { headers: authHeaders }).catch(() => null),
-        fetch(`${API_BASE}/api/categories`, { headers: authHeaders }).catch(() => null),
+        fetch(`${API_BASE}/api/overview?_t=${Date.now()}${qRegion}${qCategory}`, { headers: authHeaders, signal }).catch(() => null),
+        fetch(`${API_BASE}/api/revenue-trend?_t=${Date.now()}${qRegion}`, { headers: authHeaders, signal }).catch(() => null),
+        fetch(`${API_BASE}/api/stores/top?limit=10${qRegion}`, { headers: authHeaders, signal }).catch(() => null),
+        fetch(`${API_BASE}/api/customer-segments?_t=${Date.now()}`, { headers: authHeaders, signal }).catch(() => null),
+        fetch(`${API_BASE}/api/categories?_t=${Date.now()}${qCategory}${qRegion}`, { headers: authHeaders, signal }).catch(() => null),
       ]);
 
-      if (kpiRes && kpiRes.ok) {
-        setKpis(await kpiRes.json());
+      if (signal.aborted) return;
+
+      const hasLiveResponses = [kpiRes, revRes, storeRes, segRes, catRes].some(
+        (r) => r !== null && r.ok
+      );
+
+      if (hasLiveResponses) {
+        setIsLiveDatabase(true);
+
+        if (kpiRes && kpiRes.ok) setKpis(await kpiRes.json());
+        if (revRes && revRes.ok) setRevenueTrends(await revRes.json());
+        if (storeRes && storeRes.ok) setTopStores(await storeRes.json());
+        if (segRes && segRes.ok) setCustomerSegments(await segRes.json());
+        if (catRes && catRes.ok) setCategories(await catRes.json());
       } else {
+        // Fallback to static offline data
+        setIsLiveDatabase(false);
         setKpis(FALLBACK_KPIS);
-      }
-
-      if (revRes && revRes.ok) {
-        setRevenueTrends(await revRes.json());
-      } else {
         setRevenueTrends(selectedRegion === "All" ? FALLBACK_TRENDS : FALLBACK_TRENDS.filter(t => t.region === selectedRegion));
-      }
-
-      if (storeRes && storeRes.ok) {
-        setTopStores(await storeRes.json());
-      } else {
         setTopStores(selectedRegion === "All" ? FALLBACK_STORES : FALLBACK_STORES.filter(s => s.region === selectedRegion));
-      }
-
-      if (segRes && segRes.ok) {
-        setCustomerSegments(await segRes.json());
-      } else {
         setCustomerSegments(FALLBACK_SEGMENTS);
-      }
-
-      if (catRes && catRes.ok) {
-        setCategories(await catRes.json());
-      } else {
         setCategories(selectedCategory === "All" ? FALLBACK_CATEGORIES : FALLBACK_CATEGORIES.filter(c => c.category === selectedCategory));
       }
-    } catch (err) {
-      console.warn("API request failed, falling back to static offline metrics for Vercel:", err);
+    } catch (err: unknown) {
+      if ((err as Error)?.name === "AbortError") return;
+      setIsLiveDatabase(false);
       setKpis(FALLBACK_KPIS);
       setRevenueTrends(FALLBACK_TRENDS);
       setTopStores(FALLBACK_STORES);
       setCustomerSegments(FALLBACK_SEGMENTS);
       setCategories(FALLBACK_CATEGORIES);
     } finally {
-      setIsLoading(false);
+      setIsOverviewLoading(false);
     }
   }, [selectedRegion, selectedCategory]);
 
-  // Fetch paginated transactions (with interactive offline / Vercel fallback)
+  // Fetch paginated transactions with store filtering and fallback sorting
   const fetchTransactions = useCallback(async () => {
+    if (txAbortRef.current) {
+      txAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    txAbortRef.current = controller;
+
+    setIsTransactionsLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(page),
@@ -150,26 +157,52 @@ export function App() {
         search: searchQuery,
         region: selectedRegion,
         category: selectedCategory,
+        storeId: selectedStoreId,
         sortBy,
         sortDir,
       });
+
       const res = await fetch(`${API_BASE}/api/transactions?${params.toString()}`, {
         headers: getAuthHeaders(),
+        signal: controller.signal,
       }).catch(() => null);
+
+      if (controller.signal.aborted) return;
+
       if (res && res.ok) {
-        setTransactions(await res.json());
+        const liveTx = await res.json();
+        setTransactions(liveTx);
+        setIsLiveDatabase(true);
       } else {
+        // Safe offline fallback with sorting and filtering
         let filtered = [...FALLBACK_TRANSACTIONS.items];
         if (selectedRegion !== "All") filtered = filtered.filter(t => t.region === selectedRegion);
         if (selectedCategory !== "All") filtered = filtered.filter(t => t.category === selectedCategory);
+        if (selectedStoreId !== "All") filtered = filtered.filter(t => t.store_id === selectedStoreId);
+
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
           filtered = filtered.filter(t => 
             t.order_id.toLowerCase().includes(q) || 
             t.customer_name.toLowerCase().includes(q) || 
-            t.product_name.toLowerCase().includes(q)
+            t.product_name.toLowerCase().includes(q) ||
+            t.store_id.toLowerCase().includes(q) ||
+            t.store_name.toLowerCase().includes(q)
           );
         }
+
+        // Apply offline sorting
+        filtered.sort((a, b) => {
+          const valA = (a as unknown as Record<string, unknown>)[sortBy];
+          const valB = (b as unknown as Record<string, unknown>)[sortBy];
+          if (typeof valA === "number" && typeof valB === "number") {
+            return sortDir === "asc" ? valA - valB : valB - valA;
+          }
+          return sortDir === "asc"
+            ? String(valA ?? "").localeCompare(String(valB ?? ""))
+            : String(valB ?? "").localeCompare(String(valA ?? ""));
+        });
+
         setTransactions({
           page,
           limit: 15,
@@ -178,18 +211,26 @@ export function App() {
           items: filtered.slice((page - 1) * 15, page * 15)
         });
       }
-    } catch (err) {
-      console.warn("Transactions API failed, using fallback data:", err);
+    } catch (err: unknown) {
+      if ((err as Error)?.name === "AbortError") return;
       setTransactions(FALLBACK_TRANSACTIONS);
+    } finally {
+      setIsTransactionsLoading(false);
     }
-  }, [page, searchQuery, selectedRegion, selectedCategory, sortBy, sortDir]);
+  }, [page, searchQuery, selectedRegion, selectedCategory, selectedStoreId, sortBy, sortDir]);
 
   useEffect(() => {
     fetchData();
+    return () => {
+      if (dataAbortRef.current) dataAbortRef.current.abort();
+    };
   }, [fetchData]);
 
   useEffect(() => {
     fetchTransactions();
+    return () => {
+      if (txAbortRef.current) txAbortRef.current.abort();
+    };
   }, [fetchTransactions]);
 
   const handleSort = (col: string) => {
@@ -212,7 +253,7 @@ export function App() {
           fetchData();
           fetchTransactions();
         }}
-        isLoading={isLoading}
+        isLoading={isOverviewLoading || isTransactionsLoading}
         selectedRegion={selectedRegion}
         onRegionChange={(r) => {
           setSelectedRegion(r);
@@ -224,13 +265,30 @@ export function App() {
           setPage(1);
         }}
         totalTransactions={transactions?.total ?? 150000}
+        isLive={isLiveDatabase}
       />
+
+      {/* Demo / Offline Notification Alert */}
+      {!isLiveDatabase && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-800 dark:text-amber-200 px-4 py-2 text-xs text-center flex items-center justify-center gap-2">
+          <span>⚡ Running in <b>Demo / Offline Mode</b>: Live SQLite API is unreachable or requires an access token. Showing pre-computed dataset.</span>
+          <button
+            onClick={() => {
+              fetchData();
+              fetchTransactions();
+            }}
+            className="underline font-semibold hover:text-amber-950 dark:hover:text-amber-100 cursor-pointer"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
 
       {/* Main Dashboard View */}
       <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         
         {/* 1. Executive Summary KPI Cards */}
-        <KPICards kpis={kpis} isLoading={isLoading} />
+        <KPICards kpis={kpis} isLoading={isOverviewLoading} />
 
         {/* 2. Analytical Charts Row (Query 1: MoM Revenue Growth & YTD) */}
         <div className="grid grid-cols-1 gap-6">
@@ -245,9 +303,9 @@ export function App() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <StoreRankings
             stores={topStores}
-            isLoading={isLoading}
+            isLoading={isOverviewLoading}
             onSelectStore={(id) => {
-              setSearchQuery(id);
+              setSelectedStoreId(id);
               setPage(1);
             }}
           />
@@ -255,7 +313,7 @@ export function App() {
           <CustomerSegments
             segments={customerSegments}
             isDark={isDark}
-            isLoading={isLoading}
+            isLoading={isOverviewLoading}
           />
         </div>
 
@@ -264,7 +322,7 @@ export function App() {
           <CategoryBreakdown
             categories={categories}
             isDark={isDark}
-            isLoading={isLoading}
+            isLoading={isOverviewLoading}
           />
         </div>
 
@@ -292,7 +350,12 @@ export function App() {
             onSortChange={handleSort}
             selectedTransactionId={selectedTransaction?.transaction_id}
             onSelectTransaction={(item) => setSelectedTransaction(item)}
-            isLoading={isLoading}
+            isLoading={isTransactionsLoading}
+            selectedStoreId={selectedStoreId}
+            onClearStore={() => {
+              setSelectedStoreId("All");
+              setPage(1);
+            }}
           />
         </div>
 
@@ -309,4 +372,3 @@ export function App() {
 }
 
 export default App;
-

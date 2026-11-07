@@ -7,7 +7,8 @@ import {
   ChevronRight, 
   ChevronsRight, 
   ArrowUpDown,
-  Eye
+  Eye,
+  X
 } from "lucide-react";
 
 interface TransactionsTableProps {
@@ -22,6 +23,8 @@ interface TransactionsTableProps {
   selectedTransactionId?: string;
   onSelectTransaction: (item: TransactionItem) => void;
   isLoading: boolean;
+  selectedStoreId?: string;
+  onClearStore?: () => void;
 }
 
 export const TransactionsTable: React.FC<TransactionsTableProps> = ({
@@ -36,6 +39,8 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   selectedTransactionId,
   onSelectTransaction,
   isLoading,
+  selectedStoreId,
+  onClearStore,
 }) => {
   const items = data?.items || [];
   const totalPages = data?.totalPages || 1;
@@ -52,24 +57,40 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
       
       {/* Table Toolbar */}
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 sm:w-80">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               type="text"
-              placeholder="Search by Order ID, Customer, or Product..."
+              placeholder="Search by Order ID, Customer, Store, or Product..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 transition-all"
             />
           </div>
+
+          {selectedStoreId && selectedStoreId !== "All" && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-200 border border-orange-300 dark:border-orange-800">
+              <span>Store: {selectedStoreId}</span>
+              {onClearStore && (
+                <button
+                  onClick={onClearStore}
+                  className="hover:text-orange-950 dark:hover:text-white"
+                  title="Clear store filter"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          )}
+
           <span className="text-xs font-mono text-zinc-500 hidden md:inline">
             {totalCount.toLocaleString("en-IN")} transactions matched
           </span>
         </div>
 
         <div className="text-xs text-zinc-500 flex items-center gap-2">
-          <span>Click any row to open the <b>Indian Transaction Inspector</b></span>
+          <span>Click any row to open the <b>Transaction Inspector</b></span>
         </div>
       </div>
 
@@ -173,7 +194,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                         {t.store_name}
                       </div>
                       <span className="text-[10px] font-mono text-zinc-500">
-                        {t.region}
+                        {t.region} · {t.store_id}
                       </span>
                     </td>
 
@@ -197,7 +218,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                         <div className="w-10 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                           <div
                             className="h-full bg-emerald-500 rounded-full"
-                            style={{ width: `${Math.min(100, (t.profit_margin_pct || 0) * 2.2)}%` }}
+                            style={{ width: `${Math.min(100, Math.max(0, (t.profit_margin_pct || 0) * 2.2))}%` }}
                           />
                         </div>
                       </div>

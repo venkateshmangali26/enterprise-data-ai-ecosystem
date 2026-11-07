@@ -45,6 +45,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
       monthName: monthNames[index],
       revenue: 0,
       orders: 0,
+      hasData: false,
     }));
 
     data
@@ -59,6 +60,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
 
         totals[index].revenue += Number(row.monthly_revenue) || 0;
         totals[index].orders += Number(row.order_count) || 0;
+        totals[index].hasData = true;
 
         if (row.month_short) {
           totals[index].monthName = row.month_short;
@@ -72,7 +74,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
 
       let previousRevenue: number | null = null;
       if (index > 0) {
-        previousRevenue = totals[index - 1].revenue;
+        previousRevenue = totals[index - 1].hasData ? totals[index - 1].revenue : null;
       } else {
         // Cross-year transition: For January (index 0), look up December of the preceding year (activeYear - 1)
         const priorDecRows = data.filter((row) => {
@@ -90,7 +92,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
       }
 
       const momPct =
-        previousRevenue !== null && previousRevenue > 0
+        previousRevenue !== null && previousRevenue > 0 && item.hasData
           ? Number(
               (
                 ((item.revenue - previousRevenue) / previousRevenue) * 100
@@ -106,6 +108,12 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
       };
     });
   }, [data, activeYear, selectedRegion]);
+
+  const avgMonthlyRev = useMemo(() => {
+    const activeMonths = monthlyAgg.filter((m) => m.hasData && m.revenue > 0);
+    if (!activeMonths.length) return 0;
+    return activeMonths.reduce((acc, m) => acc + m.revenue, 0) / activeMonths.length;
+  }, [monthlyAgg]);
 
   const option = useMemo(() => {
     const textColor = isDark ? "#a1a1aa" : "#71717a";
@@ -130,10 +138,13 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
           const item = monthlyAgg[idx];
           if (!item) return "";
 
-          const isFestivePeak = item.month === 10 || item.month === 11;
+          // Data-driven seasonal surge tag only if monthly revenue is >20% above year average
+          const isSurge = avgMonthlyRev > 0 && item.revenue > avgMonthlyRev * 1.2;
+          const surgeTag = isSurge ? " 📈 (High Demand Period)" : "";
+
           const momText =
             item.momPct === null
-              ? "N/A"
+              ? (item.hasData ? "Baseline Month" : "No Data")
               : `${item.momPct >= 0 ? "+" : ""}${item.momPct}%`;
           const momColor =
             item.momPct === null
@@ -144,7 +155,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
 
           return `
             <div style="font-weight: 600; margin-bottom: 4px; font-family: monospace;">
-              ${item.monthName} ${activeYear} ${isFestivePeak ? "🪔 (Festive Diwali Peak)" : ""}
+              ${item.monthName} ${activeYear}${surgeTag}
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px;">
               <span style="color:#f97316">● Monthly Net Revenue:</span>
@@ -219,7 +230,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
               type: "linear",
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: "#f97316" }, // Indian Saffron/Orange
+                { offset: 0, color: "#f97316" },
                 { offset: 1, color: "#ea580c" },
               ],
             },
@@ -249,7 +260,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
         },
       ],
     };
-  }, [monthlyAgg, isDark, activeYear]);
+  }, [monthlyAgg, isDark, activeYear, avgMonthlyRev]);
 
   return (
     <div className="p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0c0c0f] shadow-sm">
@@ -264,7 +275,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
             </span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Annual calendar-year performance tracking monthly sales momentum, December-to-January transitions, and festive peaks.
+            Annual calendar performance tracking monthly sales momentum, December-to-January transitions, and seasonal trends.
           </p>
         </div>
 

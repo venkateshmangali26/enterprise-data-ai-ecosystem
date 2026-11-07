@@ -1,15 +1,37 @@
+import "./env";
 import { Database } from "bun:sqlite";
 import path from "node:path";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync } from "node:fs";
 
-// Database configuration
-const configuredPath =
-  process.env.DATABASE_PATH ||
-  process.env.DB_PATH ||
-  path.resolve(import.meta.dir, "../retail_analytics.db");
+function resolveDatabasePath(): string {
+  const rawPath = process.env.DATABASE_PATH || process.env.DB_PATH;
+  if (rawPath) {
+    if (path.isAbsolute(rawPath)) return rawPath;
 
-// Resolve path and ensure parent directory exists
-const dbPath = path.resolve(configuredPath);
+    // 1. Check relative to cwd
+    const cwdPath = path.resolve(process.cwd(), rawPath);
+    if (existsSync(cwdPath)) return cwdPath;
+
+    // 2. Check relative to project root (2 levels up from src)
+    const rootPath = path.resolve(import.meta.dir, "../../", rawPath);
+    if (existsSync(rootPath)) return rootPath;
+
+    // 3. Check relative to backend dir (1 level up from src)
+    const backendPath = path.resolve(import.meta.dir, "../", rawPath);
+    if (existsSync(backendPath)) return backendPath;
+
+    // 4. Strip leading "backend/" or "./backend/" if cwd is already in backend/
+    const stripped = rawPath.replace(/^(\.\/)?backend[\\/]/, "");
+    const inBackendPath = path.resolve(import.meta.dir, "../", stripped);
+    if (existsSync(inBackendPath)) return inBackendPath;
+
+    return cwdPath;
+  }
+
+  return path.resolve(import.meta.dir, "../retail_analytics.db");
+}
+
+const dbPath = resolveDatabasePath();
 mkdirSync(path.dirname(dbPath), { recursive: true });
 
 // Initialize database
@@ -98,8 +120,8 @@ export function initDatabaseSchema(): void {
       unit_cost       REAL NOT NULL CHECK(unit_cost >= 0),
       discount_pct    REAL NOT NULL DEFAULT 0.0 CHECK(discount_pct BETWEEN 0.0 AND 1.0),
       discount_amount REAL NOT NULL DEFAULT 0.0 CHECK(discount_amount >= 0.0),
-      net_revenue     REAL NOT NULL,
-      total_cost      REAL NOT NULL,
+      net_revenue     REAL NOT NULL CHECK(net_revenue >= -0.01),
+      total_cost      REAL NOT NULL CHECK(total_cost >= 0.0),
       gross_profit    REAL NOT NULL,
       shipping_cost   REAL NOT NULL DEFAULT 0.0 CHECK(shipping_cost >= 0.0),
       FOREIGN KEY (store_id) REFERENCES dim_stores(store_id),
@@ -117,6 +139,16 @@ export function initDatabaseSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_fact_store_date_revenue ON fact_transactions(store_id, order_date, net_revenue);
     CREATE INDEX IF NOT EXISTS idx_fact_cust_date_revenue ON fact_transactions(customer_id, order_date, net_revenue);
   `);
+}
+
+// Automatic schema migration runner
+export function runMigrations(): void {
+  initDatabaseSchema();
+  const res = db.query("PRAGMA user_version;").get() as { user_version: number } | null;
+  const version = res?.user_version ?? 0;
+  if (version < 1) {
+    db.exec("PRAGMA user_version = 1;");
+  }
 }
 
 // Backward and forward compatibility aliases

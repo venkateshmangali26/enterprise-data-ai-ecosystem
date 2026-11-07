@@ -63,9 +63,11 @@ export const KPICards: React.FC<KPICardsProps> = ({
     ? kpis.profit_margin_pct
     : 0;
 
-  const totalOrders = kpis.total_orders || 0;
-  const activeCustomers = kpis.active_customers || 0;
-  const avgItemsPerOrder = totalOrders > 0 ? (kpis.total_units_sold / totalOrders).toFixed(1) : "0.0";
+  const totalOrders = Number.isFinite(kpis.total_orders) ? kpis.total_orders : 0;
+  const activeCustomers = Number.isFinite(kpis.active_customers) ? kpis.active_customers : 0;
+  const totalUnits = Number.isFinite(kpis.total_units_sold) ? kpis.total_units_sold : 0;
+
+  const avgItemsPerOrder = totalOrders > 0 ? (totalUnits / totalOrders).toFixed(1) : "0.0";
   const ordersPerCustomer = activeCustomers > 0 ? (totalOrders / activeCustomers).toFixed(1) : "0.0";
 
   const cards = [
@@ -85,14 +87,14 @@ export const KPICards: React.FC<KPICardsProps> = ({
     {
       title: "Gross Profit",
       value: formatINR(kpis.gross_profit),
-      subtext: `${profitMargin.toFixed(2)}% Operational Gross Margin`,
+      subtext: `${profitMargin.toFixed(2)}% Gross Margin`,
       trend: `${profitMargin.toFixed(2)}% Margin`,
       trendType: (profitMargin >= 20 ? "positive" : profitMargin > 0 ? "neutral" : "negative") as TrendType,
       icon: Percent,
       metaLabel: "Margin Health",
       metaValue: profitMargin >= 0 ? `${profitMargin.toFixed(1)}%` : `${profitMargin.toFixed(1)}% (Negative)`,
       barPercent: Math.min(100, Math.max(0, Math.round(profitMargin))),
-      barColor: "bg-emerald-500",
+      barColor: profitMargin < 0 ? "bg-rose-500" : "bg-emerald-500",
       showBar: true,
     },
     {

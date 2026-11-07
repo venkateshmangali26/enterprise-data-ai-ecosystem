@@ -4,7 +4,8 @@ import {
   Sun, 
   Moon, 
   RotateCw, 
-  Database
+  Database,
+  CloudOff
 } from "lucide-react";
 
 interface NavbarProps {
@@ -17,6 +18,7 @@ interface NavbarProps {
   selectedCategory: string;
   onCategoryChange: (c: string) => void;
   totalTransactions: number;
+  isLive?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -29,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedCategory,
   onCategoryChange,
   totalTransactions,
+  isLive = true,
 }) => {
   const regions = ["All", "North", "South", "West", "East", "Central"];
   const categories = [
@@ -59,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Pan-India Enterprise Performance & Festive Demand Intelligence
+              Pan-India Enterprise Performance & Retail Intelligence
             </p>
           </div>
         </div>
@@ -67,12 +70,25 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Global Filters & Status */}
         <div className="flex items-center gap-2 sm:gap-3">
           
-          {/* Data health badge */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <Database className="w-3.5 h-3.5 text-zinc-400" />
-            <span>{(totalTransactions || 150000).toLocaleString("en-IN")} Txns</span>
-          </div>
+          {/* Transparent Live vs Demo Data Badge */}
+          {isLive ? (
+            <div 
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs font-mono text-emerald-800 dark:text-emerald-300"
+              title="Connected directly to high-performance SQLite analytical database"
+            >
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Live DB: {(totalTransactions || 150000).toLocaleString("en-IN")} Txns</span>
+            </div>
+          ) : (
+            <div 
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs font-mono text-amber-800 dark:text-amber-300"
+              title="Running in static offline/demo mode (backend unreachable or unauthenticated)"
+            >
+              <CloudOff className="w-3.5 h-3.5 text-amber-500" />
+              <span>Demo / Fallback Mode</span>
+            </div>
+          )}
 
           {/* Region Filter */}
           <div className="flex items-center gap-1.5">

@@ -1,37 +1,11 @@
-import { db, initDatabaseSchema } from "./db";
+import "./env";
+import { db, runMigrations } from "./db";
 import path from "path";
-import { existsSync, statSync, readFileSync } from "fs";
+import { existsSync, statSync, realpathSync } from "fs";
 import { timingSafeEqual } from "node:crypto";
 
-// Fallback loader for .env from backend/.env or root .env regardless of working directory
-const possibleEnvPaths = [
-  path.resolve(import.meta.dir, "../.env"),
-  path.resolve(import.meta.dir, "../../.env"),
-];
-for (const envPath of possibleEnvPaths) {
-  if (existsSync(envPath)) {
-    try {
-      const content = readFileSync(envPath, "utf-8");
-      for (const line of content.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const idx = trimmed.indexOf("=");
-        if (idx !== -1) {
-          const key = trimmed.slice(0, idx).trim();
-          const val = trimmed.slice(idx + 1).trim();
-          if (!process.env[key]) {
-            process.env[key] = val;
-          }
-        }
-      }
-    } catch {
-      // Ignore env read error
-    }
-  }
-}
-
-// Initialize database schema on module load
-initDatabaseSchema();
+// Ensure database schema and migrations are initialized
+runMigrations();
 
 const DIST_DIR = process.env.DIST_DIR || path.resolve(import.meta.dir, "../../frontend/dist");
 
@@ -82,7 +56,9 @@ export function getCorsHeaders(req?: Request): Record<string, string> {
 
   const origin = req?.headers.get("Origin");
 
-  if (origin && (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes("*"))) {
+  if (ALLOWED_ORIGINS.includes("*")) {
+    headers["Access-Control-Allow-Origin"] = "*";
+  } else if (origin && ALLOWED_ORIGINS.includes(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
   }
 
@@ -148,6 +124,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse(
         {
           status: "healthy",
+          auth_required: REQUIRE_AUTH,
           timestamp: new Date().toISOString(),
         },
         200,
@@ -366,10 +343,14 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // Endpoint 4: Top Stores Ranked by Margin & Volume (Validated limit)
     if (url.pathname === "/api/stores/top") {
-      const requestedLimit = Number(url.searchParams.get("limit") || 10);
-      const limit = Number.isFinite(requestedLimit)
-        ? Math.min(100, Math.max(1, Math.floor(requestedLimit)))
-        : 10;
+      const rawLimit = url.searchParams.get("limit");
+      let limit = 10;
+      if (rawLimit !== null) {
+        const parsed = Number(rawLimit);
+        if (Number.isSafeInteger(parsed) && parsed >= 1) {
+          limit = Math.min(100, parsed);
+        }
+      }
 
       const region = url.searchParams.get("region");
       let filter = "1=1";
@@ -482,8 +463,22 @@ export async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse(segmentsResult, 200, req);
     }
 
-    // Endpoint 6: Category Financial Breakdown
+    // Endpoint 6: Category Financial Breakdown (Supports category and region filtering)
     if (url.pathname === "/api/categories") {
+      const category = url.searchParams.get("category");
+      const region = url.searchParams.get("region");
+      let where = "1=1";
+      const params: (string | number)[] = [];
+
+      if (category && category !== "All") {
+        where += " AND p.category = ?";
+        params.push(category);
+      }
+      if (region && region !== "All") {
+        where += " AND s.region = ?";
+        params.push(region);
+      }
+
       const query = `
         SELECT 
           p.category,
@@ -499,10 +494,12 @@ export async function handleRequest(req: Request): Promise<Response> {
           ROUND(100.0 * SUM(f.discount_amount) / NULLIF(SUM(f.net_revenue + f.discount_amount), 0), 2) AS avg_discount_pct
         FROM fact_transactions f
         JOIN dim_products p ON f.product_id = p.product_id
+        JOIN dim_stores s ON f.store_id = s.store_id
+        WHERE ${where}
         GROUP BY p.category, p.sub_category
         ORDER BY total_revenue DESC
       `;
-      const categoriesResult = db.prepare(query).all();
+      const categoriesResult = db.prepare(query).all(...params);
       return jsonResponse(categoriesResult, 200, req);
     }
 
@@ -522,22 +519,25 @@ export async function handleRequest(req: Request): Promise<Response> {
       const rawPageParam = url.searchParams.get("page");
       if (rawPageParam !== null) {
         const parsed = Number(rawPageParam);
-        if (!Number.isSafeInteger(parsed) || parsed > Number.MAX_SAFE_INTEGER) {
-          return jsonError("Invalid page parameter: must be a safe integer", 400, url.pathname, req);
+        if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > Number.MAX_SAFE_INTEGER) {
+          return jsonError("Invalid page parameter: must be a positive safe integer >= 1", 400, url.pathname, req);
         }
       }
 
-      const requestedPage = Number(rawPageParam || 1);
-      const requestedLimit = Number(url.searchParams.get("limit") || 15);
+      const rawLimitParam = url.searchParams.get("limit");
+      if (rawLimitParam !== null) {
+        const parsed = Number(rawLimitParam);
+        if (!Number.isSafeInteger(parsed) || parsed < 1) {
+          return jsonError("Invalid limit parameter: must be a positive integer >= 1", 400, url.pathname, req);
+        }
+      }
+
+      const requestedPage = rawPageParam !== null ? Number(rawPageParam) : 1;
+      const requestedLimit = rawLimitParam !== null ? Number(rawLimitParam) : 15;
 
       const MAX_PAGE = 100_000;
-      const page = Number.isSafeInteger(requestedPage)
-        ? Math.min(MAX_PAGE, Math.max(1, requestedPage))
-        : 1;
-
-      const limit = Number.isFinite(requestedLimit)
-        ? Math.min(100, Math.max(10, Math.floor(requestedLimit)))
-        : 15;
+      const page = Math.min(MAX_PAGE, requestedPage);
+      const limit = Math.min(100, Math.max(1, requestedLimit));
 
       const rawSearch = (url.searchParams.get("search") || "").trim();
       const search = rawSearch.slice(0, 100); // Guard against memory exhaustion
@@ -560,8 +560,8 @@ export async function handleRequest(req: Request): Promise<Response> {
       const params: (string | number)[] = [];
 
       if (search) {
-        where += ` AND (f.order_id LIKE ? OR f.customer_id LIKE ? OR p.product_name LIKE ? OR s.store_name LIKE ?)`;
-        params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+        where += ` AND (f.order_id LIKE ? OR f.customer_id LIKE ? OR p.product_name LIKE ? OR s.store_name LIKE ? OR s.store_id LIKE ?)`;
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
       }
       if (region && region !== "All") {
         where += " AND s.region = ?";
@@ -638,9 +638,24 @@ export async function handleRequest(req: Request): Promise<Response> {
       );
     }
 
-    // Endpoint 9: Single Transaction Details for Drawer (Unambiguous transaction_id lookup & PII masking)
+    // Endpoint 9: Single Transaction Details for Drawer (Safe ID decoding & PII masking)
     if (url.pathname.startsWith("/api/transactions/")) {
-      const id = url.pathname.split("/").pop();
+      const rawId = url.pathname.slice("/api/transactions/".length);
+      if (!rawId || rawId.includes("/")) {
+        return jsonError("Invalid transaction ID parameter", 400, url.pathname, req);
+      }
+
+      let id: string;
+      try {
+        id = decodeURIComponent(rawId).trim();
+      } catch {
+        return jsonError("Bad Request: Malformed transaction ID encoding", 400, url.pathname, req);
+      }
+
+      if (!id || id.length > 64) {
+        return jsonError("Invalid transaction ID", 400, url.pathname, req);
+      }
+
       const query = `
         SELECT 
           f.transaction_id,
@@ -687,29 +702,46 @@ export async function handleRequest(req: Request): Promise<Response> {
       return jsonError("API Endpoint Not Found", 404, url.pathname, req);
     }
 
-    // Endpoint 11: Serve Frontend Static Build (Production SPA with Path Traversal Guard)
+    // Endpoint 11: Serve Frontend Static Build (Production SPA with Symlink & Malformed Path Guard)
     if (existsSync(DIST_DIR)) {
-      const indexHtml = path.join(DIST_DIR, "index.html");
+      let realDistDir: string;
+      try {
+        realDistDir = realpathSync(DIST_DIR);
+      } catch {
+        realDistDir = path.resolve(DIST_DIR);
+      }
 
       if (url.pathname !== "/") {
-        const decodedPath = decodeURIComponent(url.pathname);
-        const requestedFile = path.resolve(DIST_DIR, `.${decodedPath}`);
-        const relativePath = path.relative(DIST_DIR, requestedFile);
+        let decodedPath: string;
+        try {
+          decodedPath = decodeURIComponent(url.pathname);
+        } catch {
+          return jsonError("Bad Request: Malformed URI encoding", 400, url.pathname, req);
+        }
 
-        const isInsideDist =
-          relativePath !== ".." &&
-          !relativePath.startsWith(`..${path.sep}`) &&
-          !path.isAbsolute(relativePath);
+        const candidateFile = path.resolve(realDistDir, `.${decodedPath}`);
+        if (existsSync(candidateFile)) {
+          let candidateRealPath: string;
+          try {
+            candidateRealPath = realpathSync(candidateFile);
+          } catch {
+            candidateRealPath = candidateFile;
+          }
 
-        if (
-          isInsideDist &&
-          existsSync(requestedFile) &&
-          statSync(requestedFile).isFile()
-        ) {
-          return new Response(Bun.file(requestedFile));
+          const isInsideDist =
+            candidateRealPath === realDistDir ||
+            candidateRealPath.startsWith(realDistDir + path.sep);
+
+          if (
+            isInsideDist &&
+            statSync(candidateRealPath).isFile()
+          ) {
+            return new Response(Bun.file(candidateRealPath));
+          }
         }
       }
 
+      const indexHtml = path.join(realDistDir, "index.html");
       if (existsSync(indexHtml)) {
         return new Response(Bun.file(indexHtml), {
           headers: {
