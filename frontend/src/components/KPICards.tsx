@@ -17,11 +17,6 @@ interface KPICardsProps {
 
 type TrendType = "positive" | "negative" | "neutral";
 
-const clampPercent = (value: number): number => {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(100, Math.max(0, Math.round(value)));
-};
-
 export const KPICards: React.FC<KPICardsProps> = ({
   kpis,
   isLoading,
@@ -68,13 +63,10 @@ export const KPICards: React.FC<KPICardsProps> = ({
     ? kpis.profit_margin_pct
     : 0;
 
-  const revenueMargin =
-    kpis.total_revenue > 0
-      ? (kpis.gross_profit / kpis.total_revenue) * 100
-      : 0;
-
   const totalOrders = kpis.total_orders || 0;
   const activeCustomers = kpis.active_customers || 0;
+  const avgItemsPerOrder = totalOrders > 0 ? (kpis.total_units_sold / totalOrders).toFixed(1) : "0.0";
+  const ordersPerCustomer = activeCustomers > 0 ? (totalOrders / activeCustomers).toFixed(1) : "0.0";
 
   const cards = [
     {
@@ -84,49 +76,50 @@ export const KPICards: React.FC<KPICardsProps> = ({
       trend: momTrendText,
       trendType: momTrendType,
       icon: IndianRupee,
-      barPercent: clampPercent(revenueMargin),
+      metaLabel: "Gross Margin Share",
+      metaValue: `${profitMargin.toFixed(1)}%`,
+      barPercent: Math.min(100, Math.max(0, Math.round(profitMargin))),
       barColor: "bg-orange-500",
+      showBar: true,
     },
     {
       title: "Gross Profit",
       value: formatINR(kpis.gross_profit),
-      subtext: `${profitMargin.toFixed(2)}% Gross Profit Margin`,
+      subtext: `${profitMargin.toFixed(2)}% Operational Gross Margin`,
       trend: `${profitMargin.toFixed(2)}% Margin`,
-      trendType: "neutral" as TrendType,
+      trendType: (profitMargin >= 20 ? "positive" : profitMargin > 0 ? "neutral" : "negative") as TrendType,
       icon: Percent,
-      barPercent: clampPercent(profitMargin),
+      metaLabel: "Margin Health",
+      metaValue: profitMargin >= 0 ? `${profitMargin.toFixed(1)}%` : `${profitMargin.toFixed(1)}% (Negative)`,
+      barPercent: Math.min(100, Math.max(0, Math.round(profitMargin))),
       barColor: "bg-emerald-500",
+      showBar: true,
     },
     {
       title: "Average Order Value (AOV)",
       value: formatINRAmount(kpis.average_order_value),
       subtext: `${totalOrders.toLocaleString("en-IN")} Total Orders`,
-      trend:
-        totalOrders > 0
-          ? `${(kpis.total_units_sold / totalOrders).toFixed(1)} Items/Order`
-          : "N/A Items/Order",
+      trend: totalOrders > 0 ? `${avgItemsPerOrder} Items/Order` : "N/A",
       trendType: "neutral" as TrendType,
       icon: CreditCard,
-      barPercent: clampPercent((kpis.average_order_value / 50000) * 100),
+      metaLabel: "Avg Basket Size",
+      metaValue: `${avgItemsPerOrder} units`,
+      barPercent: 0,
       barColor: "bg-blue-500",
+      showBar: false,
     },
     {
       title: "Active Customers",
       value: activeCustomers.toLocaleString("en-IN"),
-      subtext: `${
-        activeCustomers > 0
-          ? (totalOrders / activeCustomers).toFixed(1)
-          : "0.0"
-      } Orders / Customer`,
-      trend: `${
-        Number.isFinite(kpis.avg_discount_pct)
-          ? kpis.avg_discount_pct.toFixed(2)
-          : "0.00"
-      }% Average Discount`,
+      subtext: `${ordersPerCustomer} Orders / Customer`,
+      trend: `${Number.isFinite(kpis.avg_discount_pct) ? kpis.avg_discount_pct.toFixed(2) : "0.00"}% Avg Discount`,
       trendType: "neutral" as TrendType,
       icon: Users,
-      barPercent: 82,
+      metaLabel: "Repeat Frequency",
+      metaValue: `${ordersPerCustomer} orders`,
+      barPercent: 0,
       barColor: "bg-purple-500",
+      showBar: false,
     },
   ];
 
@@ -184,17 +177,21 @@ export const KPICards: React.FC<KPICardsProps> = ({
             <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60">
               <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
                 <span>{card.subtext}</span>
-                <span className="font-mono text-[11px]">
-                  {card.barPercent}%
+                <span className="font-mono text-[11px] font-medium text-zinc-700 dark:text-zinc-300">
+                  {card.metaValue}
                 </span>
               </div>
 
-              <div className="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${card.barColor} transition-all duration-500`}
-                  style={{ width: `${card.barPercent}%` }}
-                />
-              </div>
+              {card.showBar ? (
+                <div className="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${card.barColor} transition-all duration-500`}
+                    style={{ width: `${card.barPercent}%` }}
+                  />
+                </div>
+              ) : (
+                <div className="h-1.5" />
+              )}
             </div>
           </div>
         );

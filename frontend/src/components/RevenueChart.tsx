@@ -70,7 +70,24 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
     return totals.map((item, index) => {
       runningYtd += item.revenue;
 
-      const previousRevenue = index > 0 ? totals[index - 1].revenue : null;
+      let previousRevenue: number | null = null;
+      if (index > 0) {
+        previousRevenue = totals[index - 1].revenue;
+      } else {
+        // Cross-year transition: For January (index 0), look up December of the preceding year (activeYear - 1)
+        const priorDecRows = data.filter((row) => {
+          const matchesPrevYear = row.year === activeYear - 1;
+          const matchesMonth = row.month === 12;
+          const matchesRegion = !selectedRegion || selectedRegion === "All" || row.region === selectedRegion;
+          return matchesPrevYear && matchesMonth && matchesRegion;
+        });
+        if (priorDecRows.length > 0) {
+          const sumPriorDec = priorDecRows.reduce((sum, r) => sum + (Number(r.monthly_revenue) || 0), 0);
+          if (sumPriorDec > 0) {
+            previousRevenue = sumPriorDec;
+          }
+        }
+      }
 
       const momPct =
         previousRevenue !== null && previousRevenue > 0
@@ -247,11 +264,11 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
             </span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Window calculations tracking festive spikes (Diwali, Dhanteras, Navratri & Wedding season).
+            Annual calendar-year performance tracking monthly sales momentum, December-to-January transitions, and festive peaks.
           </p>
         </div>
 
-        {/* Year Selector Pills */}
+        {/* Dynamic Year Selector Pills */}
         <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800">
           {displayYears.map((y) => (
             <button
@@ -263,7 +280,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
                   : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
-              FY {y}
+              {y}
             </button>
           ))}
         </div>

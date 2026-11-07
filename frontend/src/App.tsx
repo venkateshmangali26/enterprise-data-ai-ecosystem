@@ -26,6 +26,9 @@ import {
 } from "./data/fallbackData";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
+const AUTH_HEADERS: HeadersInit = {
+  Authorization: "Bearer retail-analytics-secure-token-2025",
+};
 
 export function App() {
   const [isDark, setIsDark] = useState<boolean>(true);
@@ -71,7 +74,7 @@ export function App() {
         fetch(`${API_BASE}/api/overview?_t=${Date.now()}${qRegion}${qCategory}`).catch(() => null),
         fetch(`${API_BASE}/api/revenue-trend?_t=${Date.now()}${qRegion}`).catch(() => null),
         fetch(`${API_BASE}/api/stores/top?limit=10${qRegion}`).catch(() => null),
-        fetch(`${API_BASE}/api/customer-segments`).catch(() => null),
+        fetch(`${API_BASE}/api/customer-segments`, { headers: AUTH_HEADERS }).catch(() => null),
         fetch(`${API_BASE}/api/categories`).catch(() => null),
       ]);
 
@@ -128,7 +131,9 @@ export function App() {
         sortBy,
         sortDir,
       });
-      const res = await fetch(`${API_BASE}/api/transactions?${params.toString()}`).catch(() => null);
+      const res = await fetch(`${API_BASE}/api/transactions?${params.toString()}`, {
+        headers: AUTH_HEADERS,
+      }).catch(() => null);
       if (res && res.ok) {
         setTransactions(await res.json());
       } else {
