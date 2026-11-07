@@ -1,20 +1,29 @@
 import { Database } from "bun:sqlite";
-import path from "path";
+import path from "node:path";
+import { mkdirSync } from "node:fs";
 
-const dbPath = process.env.DATABASE_PATH || process.env.DB_PATH || path.resolve(__dirname, "../retail_analytics.db");
+// Database configuration
+const configuredPath =
+  process.env.DATABASE_PATH ||
+  process.env.DB_PATH ||
+  path.resolve(import.meta.dir, "../retail_analytics.db");
+
+// Resolve path and ensure parent directory exists
+const dbPath = path.resolve(configuredPath);
+mkdirSync(path.dirname(dbPath), { recursive: true });
+
+// Initialize database
 export const db = new Database(dbPath, { create: true });
 
-// Enable foreign key constraint enforcement
+// Enable foreign key constraints and SQLite performance optimizations
 db.exec("PRAGMA foreign_keys = ON;");
-
-// Enable Write-Ahead Logging (WAL) and memory optimizations for high throughput
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA synchronous = NORMAL;");
 db.exec("PRAGMA busy_timeout = 5000;"); // Wait up to 5s before throwing SQLITE_BUSY under concurrency
 db.exec("PRAGMA temp_store = MEMORY;");
 db.exec("PRAGMA cache_size = -64000;"); // 64MB cache
 
-export function initDatabaseSchema() {
+export function initDatabaseSchema(): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS dim_stores (
       store_id        TEXT PRIMARY KEY,
@@ -23,9 +32,9 @@ export function initDatabaseSchema() {
       state           TEXT NOT NULL,
       region          TEXT NOT NULL,
       store_type      TEXT NOT NULL,
-      square_footage  INTEGER NOT NULL,
+      square_footage  INTEGER NOT NULL CHECK(square_footage >= 0),
       opening_date    TEXT NOT NULL,
-      is_active       INTEGER NOT NULL DEFAULT 1
+      is_active       INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1))
     );
 
     CREATE INDEX IF NOT EXISTS idx_stores_region ON dim_stores(region);
@@ -36,8 +45,8 @@ export function initDatabaseSchema() {
       product_name    TEXT NOT NULL,
       category        TEXT NOT NULL,
       sub_category    TEXT NOT NULL,
-      unit_cost       REAL NOT NULL,
-      retail_price    REAL NOT NULL
+      unit_cost       REAL NOT NULL CHECK(unit_cost >= 0),
+      retail_price    REAL NOT NULL CHECK(retail_price >= 0)
     );
 
     CREATE INDEX IF NOT EXISTS idx_products_category ON dim_products(category);
@@ -61,20 +70,19 @@ export function initDatabaseSchema() {
       date_key        INTEGER PRIMARY KEY,
       date            TEXT UNIQUE NOT NULL,
       year            INTEGER NOT NULL,
-      quarter         INTEGER NOT NULL,
+      quarter         INTEGER NOT NULL CHECK(quarter BETWEEN 1 AND 4),
       quarter_name    TEXT NOT NULL,
-      month           INTEGER NOT NULL,
+      month           INTEGER NOT NULL CHECK(month BETWEEN 1 AND 12),
       month_name      TEXT NOT NULL,
       month_short     TEXT NOT NULL,
-      day             INTEGER NOT NULL,
+      day             INTEGER NOT NULL CHECK(day BETWEEN 1 AND 31),
       day_of_week     INTEGER NOT NULL,
       day_name        TEXT NOT NULL,
-      is_weekend      INTEGER NOT NULL,
+      is_weekend      INTEGER NOT NULL CHECK(is_weekend IN (0, 1)),
       fiscal_quarter  TEXT NOT NULL,
       fiscal_year     INTEGER NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_calendar_date ON dim_calendar(date);
     CREATE INDEX IF NOT EXISTS idx_calendar_year_month ON dim_calendar(year, month);
 
     CREATE TABLE IF NOT EXISTS fact_transactions (
@@ -85,15 +93,15 @@ export function initDatabaseSchema() {
       store_id        TEXT NOT NULL,
       product_id      TEXT NOT NULL,
       customer_id     TEXT NOT NULL,
-      quantity        INTEGER NOT NULL,
-      unit_price      REAL NOT NULL,
-      unit_cost       REAL NOT NULL,
-      discount_pct    REAL NOT NULL DEFAULT 0.0,
-      discount_amount REAL NOT NULL DEFAULT 0.0,
+      quantity        INTEGER NOT NULL CHECK(quantity > 0),
+      unit_price      REAL NOT NULL CHECK(unit_price >= 0),
+      unit_cost       REAL NOT NULL CHECK(unit_cost >= 0),
+      discount_pct    REAL NOT NULL DEFAULT 0.0 CHECK(discount_pct BETWEEN 0.0 AND 1.0),
+      discount_amount REAL NOT NULL DEFAULT 0.0 CHECK(discount_amount >= 0.0),
       net_revenue     REAL NOT NULL,
       total_cost      REAL NOT NULL,
       gross_profit    REAL NOT NULL,
-      shipping_cost   REAL NOT NULL DEFAULT 0.0,
+      shipping_cost   REAL NOT NULL DEFAULT 0.0 CHECK(shipping_cost >= 0.0),
       FOREIGN KEY (store_id) REFERENCES dim_stores(store_id),
       FOREIGN KEY (product_id) REFERENCES dim_products(product_id),
       FOREIGN KEY (customer_id) REFERENCES dim_customers(customer_id),
@@ -106,6 +114,7 @@ export function initDatabaseSchema() {
     CREATE INDEX IF NOT EXISTS idx_fact_date_key ON fact_transactions(date_key);
     CREATE INDEX IF NOT EXISTS idx_fact_order_date ON fact_transactions(order_date);
     CREATE INDEX IF NOT EXISTS idx_fact_order_id ON fact_transactions(order_id);
+    CREATE INDEX IF NOT EXISTS idx_fact_store_date_revenue ON fact_transactions(store_id, order_date, net_revenue);
+    CREATE INDEX IF NOT EXISTS idx_fact_cust_date_revenue ON fact_transactions(customer_id, order_date, net_revenue);
   `);
 }
-
