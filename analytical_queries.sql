@@ -1,6 +1,6 @@
 -- =============================================================================
 -- RETAIL ANALYTICS - COMPLEX ANALYTICAL SQL QUERIES
--- Dialect: PostgreSQL / DuckDB Compatible
+-- Dialect: SQLite / Bun SQLite Native (ANSI SQL & Window Function Standard)
 -- Utilizes: Common Table Expressions (CTEs), Window Functions, Robust Edge Cases
 -- =============================================================================
 
@@ -11,18 +11,25 @@
 -- Business Purpose:
 -- Evaluates sales momentum across commercial territories. Identifies sudden drops
 -- or accelerations in demand while tracking progress against annual regional targets.
+--
+-- Note on Window Lag:
+-- Evaluates consecutive active sales periods for each territory. For strict calendar
+-- continuity without data gaps, calendar dimension cross-joins can pre-fill zero-sales periods.
 -- -----------------------------------------------------------------------------
 
 WITH monthly_regional_revenue AS (
-    -- Step 1: Aggregate net revenue by region, year, and month
+    -- Step 1: Aggregate net revenue, profit, and volume by region, year, and month
     SELECT
         s.region,
         c.year,
         c.month,
+        c.month_short,
         c.month_name,
-        ROUND(SUM(f.net_revenue), 2) AS monthly_revenue,
-        SUM(f.quantity)              AS units_sold,
-        COUNT(DISTINCT f.order_id)   AS order_count
+        c.year || '-' || printf('%02d', c.month) AS period,
+        ROUND(SUM(f.net_revenue), 2)  AS monthly_revenue,
+        ROUND(SUM(f.gross_profit), 2) AS monthly_profit,
+        SUM(f.quantity)               AS units_sold,
+        COUNT(DISTINCT f.order_id)    AS order_count
     FROM fact_transactions f
     INNER JOIN dim_stores s
         ON f.store_id = s.store_id
@@ -32,6 +39,7 @@ WITH monthly_regional_revenue AS (
         s.region,
         c.year,
         c.month,
+        c.month_short,
         c.month_name
 ),
 windowed_growth_and_ytd AS (
@@ -40,8 +48,11 @@ windowed_growth_and_ytd AS (
         region,
         year,
         month,
+        month_short,
         month_name,
+        period,
         monthly_revenue,
+        monthly_profit,
         units_sold,
         order_count,
         -- Prior month revenue for the same region
@@ -57,19 +68,22 @@ windowed_growth_and_ytd AS (
         ) AS running_ytd_revenue
     FROM monthly_regional_revenue
 )
--- Step 3: Compute MoM percentage change and format final output
+-- Step 3: Compute MoM percentage change and format final output matching RevenueTrendRow
 SELECT
     region,
     year,
     month,
+    month_short,
     month_name,
+    period,
     monthly_revenue,
+    monthly_profit,
     COALESCE(prev_month_revenue, 0.00) AS prev_month_revenue,
     -- Handle edge cases (first month nulls or zero division) with NULLIF
     ROUND(
         100.0 * (monthly_revenue - prev_month_revenue) / NULLIF(prev_month_revenue, 0),
         2
-    ) AS mom_revenue_growth_pct,
+    ) AS mom_growth_pct,
     running_ytd_revenue,
     units_sold,
     order_count
@@ -86,7 +100,7 @@ ORDER BY
 -- Business Purpose:
 -- Identifies top-performing store locations by evaluating profitability efficiency
 -- (Profit Margin %) alongside operational sales throughput (Volume Sold).
--- Includes dual dense rankings and a blended composite performance score.
+-- Output directly aligns with the TopStoreRow interface contract.
 -- -----------------------------------------------------------------------------
 
 WITH store_financial_totals AS (
@@ -165,7 +179,7 @@ ranked_stores AS (
         ) AS primary_rank
     FROM store_metrics
 )
--- Step 4: Extract top 10 stores
+-- Step 4: Extract top 10 stores (including square_footage and total_cost)
 SELECT
     primary_rank,
     store_id,
@@ -174,13 +188,16 @@ SELECT
     state,
     region,
     store_type,
-    profit_margin_pct,
-    margin_rank,
+    square_footage,
     total_volume_sold,
-    volume_rank,
+    total_orders,
     total_revenue,
+    total_cost,
     total_profit,
-    revenue_per_sqft
+    profit_margin_pct,
+    revenue_per_sqft,
+    margin_rank,
+    volume_rank
 FROM ranked_stores
 WHERE primary_rank <= 10
 ORDER BY primary_rank ASC;
@@ -191,13 +208,12 @@ ORDER BY primary_rank ASC;
 -- =============================================================================
 -- Business Purpose:
 -- Computes Recency, Frequency, and Monetary scores across 10,000 customers.
--- Categorizes each customer into actionable marketing segments (Champions,
--- Loyal Customers, Potential Loyalists, At Risk, Hibernating, etc.) and provides
--- a macro portfolio distribution breakdown.
+-- Categorizes each customer into actionable marketing segments with strict
+-- condition precedence (Recent Customers & Cannot Lose Them evaluated before broad bounds).
 -- -----------------------------------------------------------------------------
 
 WITH reference_snapshot AS (
-    -- Anchor date: maximum date in fact dataset + 1 day (SQLite / DuckDB / ANSI compatible)
+    -- Anchor date: maximum date in fact dataset + 1 day (SQLite / ANSI compatible)
     SELECT date(MAX(order_date), '+1 day') AS snapshot_date
     FROM fact_transactions
 ),
@@ -261,8 +277,8 @@ customer_segmentation AS (
             WHEN r_score >= 4 AND f_score = 1                   THEN 'Recent New Customers'
             WHEN r_score >= 4 AND f_score >= 1 AND f_score <= 3 THEN 'Potential Loyalists'
             WHEN r_score >= 3 AND f_score <= 2                  THEN 'Promising Customers'
-            WHEN r_score <= 2 AND f_score >= 3 AND m_score >= 3 THEN 'At Risk (High Value)'
             WHEN r_score = 1 AND f_score >= 4                   THEN 'Cannot Lose Them'
+            WHEN r_score <= 2 AND f_score >= 3 AND m_score >= 3 THEN 'At Risk (High Value)'
             WHEN r_score <= 2 AND f_score <= 2 AND m_score >= 3 THEN 'About to Sleep'
             WHEN r_score <= 2 AND f_score <= 2                  THEN 'Hibernating / Lost'
             ELSE 'Needs Attention'
@@ -282,4 +298,3 @@ SELECT
 FROM customer_segmentation
 GROUP BY rfm_segment
 ORDER BY total_segment_revenue DESC;
-
