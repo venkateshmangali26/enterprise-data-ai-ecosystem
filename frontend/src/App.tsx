@@ -71,11 +71,11 @@ export function App() {
       const qCategory = selectedCategory !== "All" ? `&category=${encodeURIComponent(selectedCategory)}` : "";
 
       const [kpiRes, revRes, storeRes, segRes, catRes] = await Promise.all([
-        fetch(`${API_BASE}/api/overview?_t=${Date.now()}${qRegion}${qCategory}`).catch(() => null),
-        fetch(`${API_BASE}/api/revenue-trend?_t=${Date.now()}${qRegion}`).catch(() => null),
-        fetch(`${API_BASE}/api/stores/top?limit=10${qRegion}`).catch(() => null),
+        fetch(`${API_BASE}/api/overview?_t=${Date.now()}${qRegion}${qCategory}`, { headers: AUTH_HEADERS }).catch(() => null),
+        fetch(`${API_BASE}/api/revenue-trend?_t=${Date.now()}${qRegion}`, { headers: AUTH_HEADERS }).catch(() => null),
+        fetch(`${API_BASE}/api/stores/top?limit=10${qRegion}`, { headers: AUTH_HEADERS }).catch(() => null),
         fetch(`${API_BASE}/api/customer-segments`, { headers: AUTH_HEADERS }).catch(() => null),
-        fetch(`${API_BASE}/api/categories`).catch(() => null),
+        fetch(`${API_BASE}/api/categories`, { headers: AUTH_HEADERS }).catch(() => null),
       ]);
 
       if (kpiRes && kpiRes.ok) {

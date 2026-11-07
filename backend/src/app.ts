@@ -17,7 +17,7 @@ const ALLOWED_ORIGINS = (
 
 // Configurable Authentication Middleware
 // When REQUIRE_AUTH is true, requests to protected endpoints require Authorization: Bearer <API_TOKEN>
-export const REQUIRE_AUTH = process.env.REQUIRE_AUTH === "true";
+export const REQUIRE_AUTH = process.env.REQUIRE_AUTH !== "false";
 export const API_TOKEN =
   process.env.API_TOKEN || process.env.API_KEY || "retail-analytics-secure-token-2025";
 
@@ -92,13 +92,10 @@ export async function handleRequest(req: Request): Promise<Response> {
     return jsonError("Method Not Allowed", 405, url.pathname, req);
   }
 
-  // 3. Security Guard: Authentication check for sensitive data endpoints
-  const isProtectedCustomerRoute =
-    url.pathname === "/api/customer-segments" ||
-    url.pathname === "/api/transactions" ||
-    url.pathname.startsWith("/api/transactions/");
-
-  if (isProtectedCustomerRoute && !checkAuth(req)) {
+  // 3. Security Guard: Authentication check for protected API routes
+  // Public health check is exempted; all analytical/data endpoints require Bearer token authentication
+  const isPublicRoute = url.pathname === "/api/health";
+  if (url.pathname.startsWith("/api/") && !isPublicRoute && !checkAuth(req)) {
     return jsonError("Unauthorized: Missing or invalid Bearer token", 401, url.pathname, req);
   }
 
@@ -490,7 +487,15 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // Endpoint 8: Transactions Explorer Table (Searchable & Paginated with strictly sanitized inputs)
     if (url.pathname === "/api/transactions") {
-      const requestedPage = Number(url.searchParams.get("page") || 1);
+      const rawPageParam = url.searchParams.get("page");
+      if (rawPageParam !== null) {
+        const parsed = Number(rawPageParam);
+        if (!Number.isSafeInteger(parsed) || parsed > Number.MAX_SAFE_INTEGER) {
+          return jsonError("Invalid page parameter: must be a safe integer", 400, url.pathname, req);
+        }
+      }
+
+      const requestedPage = Number(rawPageParam || 1);
       const requestedLimit = Number(url.searchParams.get("limit") || 15);
 
       const MAX_PAGE = 100_000;
@@ -673,3 +678,4 @@ export async function handleRequest(req: Request): Promise<Response> {
     return jsonError(msg, 500, url.pathname, req);
   }
 }
+
