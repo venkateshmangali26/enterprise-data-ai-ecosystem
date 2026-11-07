@@ -122,13 +122,22 @@ class FailurePredictionResponse(BaseModel):
 # =============================================================================
 
 class DenseVectorStore:
-    """In-memory Vector Store with dynamic upsert, deletion, and dense cosine similarity."""
+    """
+    Optimized Vector Search Engine for Telemetry Manuals:
+      - Unit L2 pre-normalization at ingestion time (dot product == cosine similarity)
+      - High-performance vectorized BLAS GEMV dot product
+      - Early threshold filtering with np.where (avoids sorting irrelevant candidates)
+      - O(N) top-k selection via np.argpartition for larger candidate subsets
+      - LRU query embedding & search result caching for repeated DTC / telemetry lookups
+    """
 
     def __init__(self):
         self.model = None
         self.encoder_name = "HashingVectorizerFallback-256dim"
         self.documents: List[dict] = []
         self.embeddings: Optional[np.ndarray] = None
+        self._query_cache: dict[str, np.ndarray] = {}
+        self._search_cache: dict[tuple, List[dict]] = {}
         self._init_encoder()
 
     def _init_encoder(self):
@@ -151,20 +160,38 @@ class DenseVectorStore:
     def _encode(self, texts: List[str]) -> np.ndarray:
         if self.model is not None:
             vecs = self.model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
-            return np.array(vecs, dtype=np.float32)
+            arr = np.array(vecs, dtype=np.float32)
         else:
             from sklearn.feature_extraction.text import HashingVectorizer
             hv = HashingVectorizer(n_features=self.dim, alternate_sign=False, norm="l2")
-            return hv.transform(texts).toarray().astype(np.float32)
+            arr = hv.transform(texts).toarray().astype(np.float32)
+
+        # Enforce strict unit L2 norm (prevents division by zero or float drift)
+        norms = np.linalg.norm(arr, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        return arr / norms
+
+    def _encode_query(self, query: str) -> np.ndarray:
+        """Cached query encoding for lightning-fast repeated queries."""
+        if query in self._query_cache:
+            return self._query_cache[query]
+        vec = self._encode([query])[0]
+        if len(self._query_cache) >= 1024:
+            self._query_cache.pop(next(iter(self._query_cache)))
+        self._query_cache[query] = vec
+        return vec
 
     def upsert_document(self, doc_id: str, section: str, content: str) -> bool:
         """
         Upserts a document. If doc_id exists, replaces it in-place to prevent duplication.
-        Returns True if newly inserted, False if updated existing.
+        Invalidates query search cache on index mutation.
         """
         full_text = f"{section}. {content}"
         vec = self._encode([full_text])[0]
         now = time.time()
+
+        # Invalidate search cache on mutation
+        self._search_cache.clear()
 
         for idx, doc in enumerate(self.documents):
             if doc["document_id"] == doc_id:
@@ -184,13 +211,16 @@ class DenseVectorStore:
             "indexed_at": now
         })
         if self.embeddings is None:
-            self.embeddings = np.array([vec])
+            self.embeddings = np.array([vec], dtype=np.float32)
         else:
-            self.embeddings = np.vstack([self.embeddings, vec])
+            self.embeddings = np.vstack([self.embeddings, vec]).astype(np.float32)
         return True
 
     def delete_document(self, doc_id: str) -> bool:
         """Deletes a document and removes its embedding row from the index."""
+        # Invalidate search cache on mutation
+        self._search_cache.clear()
+
         for idx, doc in enumerate(self.documents):
             if doc["document_id"] == doc_id:
                 self.documents.pop(idx)
@@ -201,28 +231,56 @@ class DenseVectorStore:
         return False
 
     def search(self, query: str, top_k: int, min_score: float) -> List[dict]:
-        if not self.documents or self.embeddings is None:
+        """
+        Executes vectorized cosine similarity search with early threshold filtering and caching.
+        """
+        if not self.documents or self.embeddings is None or self.embeddings.size == 0:
             return []
 
-        query_vec = self._encode([query])[0]
-        # Cosine similarity for normalized vectors = dot product
+        cache_key = (query, top_k, min_score)
+        if cache_key in self._search_cache:
+            return [dict(d) for d in self._search_cache[cache_key]]
+
+        query_vec = self._encode_query(query)
+
+        # High-performance BLAS GEMV dot product of pre-normalized unit vectors
         similarities = np.dot(self.embeddings, query_vec)
 
-        results = []
-        ranked_indices = np.argsort(similarities)[::-1]
+        # Early threshold filtering: eliminate sub-threshold candidates immediately
+        valid_indices = np.where(similarities >= min_score)[0]
+        if valid_indices.size == 0:
+            self._search_cache[cache_key] = []
+            return []
 
-        for idx in ranked_indices:
-            score = float(similarities[idx])
-            if score >= min_score:
-                doc = self.documents[idx]
-                results.append({
-                    "document_id": doc["document_id"],
-                    "section": doc["section"],
-                    "content": doc["content"],
-                    "score": round(score, 3)
-                })
-            if len(results) >= top_k:
-                break
+        valid_scores = similarities[valid_indices]
+
+        # Top-k selection: argpartition for larger subsets, argsort for small sets
+        if valid_indices.size > top_k:
+            if valid_indices.size > 100:
+                partition_idx = np.argpartition(valid_scores, -top_k)[-top_k:]
+                sorted_subset = partition_idx[np.argsort(valid_scores[partition_idx])[::-1]]
+            else:
+                sorted_subset = np.argsort(valid_scores)[::-1][:top_k]
+            final_indices = valid_indices[sorted_subset]
+            final_scores = valid_scores[sorted_subset]
+        else:
+            sorted_subset = np.argsort(valid_scores)[::-1]
+            final_indices = valid_indices[sorted_subset]
+            final_scores = valid_scores[sorted_subset]
+
+        results = []
+        for idx, score in zip(final_indices, final_scores):
+            doc = self.documents[idx]
+            results.append({
+                "document_id": doc["document_id"],
+                "section": doc["section"],
+                "content": doc["content"],
+                "score": round(float(score), 3)
+            })
+
+        if len(self._search_cache) >= 512:
+            self._search_cache.pop(next(iter(self._search_cache)))
+        self._search_cache[cache_key] = results
 
         return results
 

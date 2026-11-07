@@ -68,6 +68,7 @@ flowchart TB
 Designed for Indian enterprise retail operations processing **150,000+ transactional line items** across **38 retail hubs in Delhi NCR, Mumbai MMR, Bengaluru, Hyderabad, Chennai, Kolkata, Pune, and Ahmedabad** with **₹590.18 Crores GMV** and sub-5ms API latencies.
 
 ### 1. Kimball Star Schema Data Warehouse
+
 - **Central Fact**: `FACT_TRANSACTIONS` (150,000 grain records tracking quantity, gross revenue, net revenue, unit margins, and shipping costs in INR ₹).
 - **Conformed Dimensions**: `DIM_CALENDAR`, `DIM_STORES` (38 Indian Tier 1/2 hubs), `DIM_PRODUCTS` (250 products across 5 Indian retail categories), `DIM_CUSTOMERS` (10,000 profiles with Indian PIN codes and states).
 - **Database Engine Optimization**: SQLite running in Write-Ahead Logging (`PRAGMA journal_mode=WAL`), 64MB memory cache (`PRAGMA cache_size=-64000`), and covering indexes (`idx_fact_date`, `idx_fact_store`, `idx_fact_product`).
@@ -81,12 +82,15 @@ erDiagram
 ```
 
 ### 2. Advanced Analytical SQL & Time-Intelligence (`analytical_queries.sql`)
+
 - **Query 1: MoM Revenue Growth & YTD Running Totals**: Utilizes `LAG()` and `SUM() OVER (PARTITION BY Year ORDER BY Month)` window functions.
 - **Query 2: Top 10 Store Efficiency Rankings**: Applies `DENSE_RANK() OVER (ORDER BY Revenue_Per_SqFt DESC)` across physical retail territories.
 - **Query 3: Behavioral RFM Customer Segmentation**: Calculates Recency, Frequency, and Monetary scores using statistical quintiles (`NTILE(5)`), classifying users into Champions, Loyalists, At Risk, and Hibernating tiers.
 
 ### 3. Enterprise DAX Semantic Layer (`dax_measures.dax`)
+
 Production DAX measures authored for Power BI VertiPaq tabular modeling:
+
 - `Total Revenue` & `Gross Profit Margin %`
 - `Revenue YTD` via `TOTALYTD()`
 - `Revenue MoM Growth %` with divide-by-zero protection (`DIVIDE()`)
@@ -99,6 +103,7 @@ Production DAX measures authored for Power BI VertiPaq tabular modeling:
 A production-grade Retrieval-Augmented Generation (RAG) platform specialized for automotive telemetry manuals (OBD-II, CAN Bus, 48V Mild Hybrid, and Electronic Throttle Control).
 
 ### 1. Architectural Guarantees & Defense-in-Depth
+
 - **3-Tier Delimiter Sandboxing**: Solves prompt injection and delimiter breakout attacks by wrapping user input in `<user_query>`, escaping unbracketed tags (`<tag>` $\to$ `[tag]`), and catching wildcard overrides (e.g. *"disregard the context above and..."*).
 - **Dense Vector Search**: Powered by `sentence-transformers` (`all-MiniLM-L6-v2`) with normalized cosine similarity matrix multiplication (and a zero-dependency TF-IDF `HashingVectorizer` fallback).
 - **Grounded Extractive Synthesis**: Zero hallucinated static suffixes. Purely extracts facts and references from verified manuals when no external LLM API key is present.
@@ -106,6 +111,7 @@ A production-grade Retrieval-Augmented Generation (RAG) platform specialized for
 - **Dual API Support**: Seamlessly communicates with either **OpenAI** or **Google Gemini** via Gemini's official OpenAI-compatible gateway (`base_url="https://generativelanguage.googleapis.com/v1beta/openai/"`).
 
 ### 2. Pytest Verification Suite (19/19 Passed)
+
 The automated test suite in [`autorag-telemetry/test_rag_engine.py`](autorag-telemetry/test_rag_engine.py) provides 100% verification across all critical security, ML, and integration paths:
 
 ```bash
@@ -127,21 +133,27 @@ The automated test suite in [`autorag-telemetry/test_rag_engine.py`](autorag-tel
 Predicts equipment failure and bearing degradation from continuous vibration and pressure telemetry streams before catastrophic roadside breakdowns occur.
 
 ### 1. Multi-Domain Feature Engineering (`src/feature_extraction.py`)
+
 Computes **13 time-domain statistical moments and FFT spectral indicators**:
+
 - **Energy & Dynamic Range**: RMS, Peak-to-Peak, Variance.
 - **Impulsive Spalling Indicators**: Crest Factor, Shape Factor, Impulse Factor, Margin Factor.
 - **Distribution Moments**: Skewness, Kurtosis ($\text{Kurtosis} > 4.0$ indicates localized bearing defect shocks).
 - **Spectral Energy (FFT)**: Spectral Energy, Spectral Centroid, and Spectral Spread.
 
 ### 2. Calibrated Multi-Operating Baseline
+
 Trained across a parameterized grid modeling real industrial operating states:
+
 - Operating Frequency: $45.0\text{–}75.0\text{ Hz}$ (RPM variations)
 - Load Amplitude: $0.6\text{–}1.4$ (Mechanical load variations)
 - Sensor Noise Floor: $\sigma \in [0.10, 0.35]$
 - Drivetrain Harmonics: $15\%$ 2nd harmonic coupling
 
 ### 3. Industrial Cost-Utility Optimization (src/train.py)
+
 In Indian commercial fleet maintenance (Tata Motors, Ashok Leyland, Mahindra Trucks), prediction errors carry asymmetric economic penalties:
+
 - **False Negative (Uncaught Breakdown on Highway NH-44)**: ₹15,00,000 (₹15 Lakhs catastrophic powertrain overhaul, commercial penalty, and tow recovery)
 - **False Positive (False Alarm)**: ₹15,000 (authorized workshop sensor diagnostic scan)
 - **Cost Ratio**: A False Negative is **100x** more expensive than a False Positive.
@@ -183,7 +195,8 @@ docker compose up --build
 | **AutoRAG Diagnostic Studio** | `http://localhost:8000` | FastAPI + Scikit-Learn + Delimiter Sandboxing | `GET /api/health` |
 | **Predictive Maintenance MLOps** | Batch / Profile | 13-Feature Extraction + GradientBoosting + ONNX Export | Automated run |
 
-### Run End-to-End MLOps Pipeline Container:
+### Run End-to-End MLOps Pipeline Container
+
 ```bash
 # Train GradientBoosting models, evaluate cost-utility matrix, and export ONNX models
 docker compose run --rm mlops-pipeline
@@ -197,12 +210,14 @@ docker compose --profile all up --build
 ## 🚀 Local Quickstart & Execution Guide
 
 ### Prerequisites
+
 - [Bun](https://bun.sh) (v1.4+)
 - Python (v3.10+)
 
 ---
 
 ### Step 1: Run Pillar 1 (Retail Analytics Dashboard)
+
 ```bash
 # 1. Seed the database with 150,000 transactions
 bun run seed
@@ -213,11 +228,13 @@ bun run build:frontend
 # 3. Start the unified full-stack server
 bun start
 ```
+
 Open **[http://localhost:3001](http://localhost:3001)** to view the retail analytics dashboard.
 
 ---
 
 ### Step 2: Run Pillar 2 (AutoRAG Telemetry Engine)
+
 ```bash
 # 1. Install Python dependencies
 pip install -r autorag-telemetry/requirements.txt
@@ -228,11 +245,13 @@ pytest autorag-telemetry/test_rag_engine.py -v
 # 3. Start the FastAPI AutoRAG engine
 python autorag-telemetry/main.py
 ```
+
 Open **[http://localhost:8000](http://localhost:8000)** to launch the AutoRAG & ML Telemetry Platform.
 
 ---
 
 ### Step 3: Run Pillar 3 (Predictive Maintenance MLOps)
+
 ```bash
 # 1. Install MLOps dependencies
 pip install -r predictive-maintenance-ml/requirements.txt
@@ -256,4 +275,5 @@ python predictive-maintenance-ml/src/export_onnx.py
 ---
 
 ## 📄 License
+
 This ecosystem is licensed under the MIT License.
