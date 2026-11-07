@@ -4,7 +4,7 @@ import { existsSync, statSync } from "fs";
 
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
-const DIST_DIR = process.env.DIST_DIR || path.resolve(__dirname, "../../frontend/dist");
+const DIST_DIR = process.env.DIST_DIR || path.resolve(import.meta.dir, "../../frontend/dist");
 
 initDatabaseSchema();
 
@@ -317,8 +317,8 @@ const server = Bun.serve({
                 WHEN r_score >= 3 AND f_score >= 3 AND m_score >= 3 THEN 'Loyal Customers'
                 WHEN r_score >= 4 AND f_score = 1 THEN 'Recent Customers'
                 WHEN r_score >= 4 AND f_score <= 3 THEN 'Potential Loyalists'
-                WHEN r_score <= 2 AND f_score >= 3 AND m_score >= 3 THEN 'At Risk'
                 WHEN r_score = 1 AND f_score >= 4 THEN 'Cannot Lose Them'
+                WHEN r_score <= 2 AND f_score >= 3 AND m_score >= 3 THEN 'At Risk'
                 WHEN r_score <= 2 AND f_score <= 2 THEN 'Hibernating / Lost'
                 ELSE 'Needs Attention'
               END AS rfm_segment
